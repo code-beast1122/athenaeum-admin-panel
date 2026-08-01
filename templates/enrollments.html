@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, status_badge, avatar, empty_state, select %}
+
+{% block title %}Enrollments · Athenaeum Admin{% endblock %}
+{% block heading %}Enrollments{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Enrollments</h1>
+        <p>{{ total }} enrollment(s) · {{ revenue | money }} on this page from paid seats.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('enrollments.export', q=search, course_id=course_id, status=status) }}">
+            <i class="fas fa-download"></i> Export CSV</a>
+        <button class="btn btn-primary" data-modal-open="createEnrollment"><i class="fas fa-plus"></i> New enrollment</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('enrollments.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search student name…">
+            </div>
+            <select name="course_id" data-autosubmit>
+                <option value="all">All courses</option>
+                {% for c in courses %}<option value="{{ c.id }}" {{ 'selected' if course_id == c.id }}>{{ c.title }}</option>{% endfor %}
+            </select>
+            <select name="status" data-autosubmit>
+                <option value="all">All payment statuses</option>
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Student</th><th>Course</th><th>Price</th><th>Payment</th>
+                    <th>Transaction</th><th>Enrolled</th><th class="actions">Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for e in enrollments %}
+                <tr>
+                    <td><div class="user-info">{{ avatar(e.student.full_name or '?', e.student.avatar_url) }}
+                        <a class="link" href="{{ url_for('users.detail', user_id=e.student_id) }}">
+                            {{ e.student.full_name or 'Unknown student' }}</a></div></td>
+                    <td>{% if e.courses %}
+                            <a class="link" href="{{ url_for('courses.detail', course_id=e.course_id) }}">{{ e.courses.title }}</a>
+                        {% else %}<span class="muted">Deleted course</span>{% endif %}</td>
+                    <td>{{ (e.courses.price if e.courses else 0) | money }}</td>
+                    <td>{{ status_badge(e.payment_status) }}</td>
+                    <td class="muted">{{ e.transaction_id or '—' }}</td>
+                    <td class="muted">{{ e.enrolled_at | date }}</td>
+                    <td class="actions">
+                        <button class="icon-btn" data-modal-open="editEnrollment" data-edit-modal="editEnrollment"
+                                data-action="{{ url_for('enrollments.update', enrollment_id=e.id) }}"
+                                data-row='{{ {"payment_status": e.payment_status, "transaction_id": e.transaction_id} | tojson }}'>
+                            <i class="fas fa-pen"></i></button>
+                        {{ action_form(url_for('enrollments.delete', enrollment_id=e.id), csrf_token, '',
+                                       'fas fa-trash', 'icon-btn danger', 'Remove this enrollment?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">{{ empty_state('No enrollments match these filters.', 'fas fa-user-graduate') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'enrollments.index', {'q': search, 'course_id': course_id, 'status': status}) }}
+    </div>
+</div>
+
+{% call modal('createEnrollment', 'New enrollment', 'sm') %}
+<form method="post" action="{{ url_for('enrollments.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="student_id">Student</label>{{ select('student_id', students, '', 'Select a student…') }}</div>
+    <div class="field"><label for="course_id">Course</label>{{ select('course_id', courses, '', 'Select a course…') }}</div>
+    <div class="field"><label for="payment_status">Payment status</label>{{ select('payment_status', statuses, 'free') }}</div>
+    <div class="field"><label>Transaction reference</label><input type="text" name="transaction_id"></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('editEnrollment', 'Update enrollment', 'sm') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Payment status</label>
+        <select name="payment_status">
+            {% for s in statuses %}<option value="{{ s }}">{{ s | pretty }}</option>{% endfor %}
+        </select></div>
+    <div class="field"><label>Transaction reference</label><input type="text" name="transaction_id"></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

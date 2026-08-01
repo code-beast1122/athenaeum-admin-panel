@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, status_badge, avatar, empty_state, select %}
+
+{% block title %}Users · Athenaeum Admin{% endblock %}
+{% block heading %}Users{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>User Management</h1>
+        <p>{{ total }} account(s) · students, teachers, parents and admins.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('reports.export', table_name='profiles') }}">
+            <i class="fas fa-download"></i> Export CSV</a>
+        <button class="btn btn-primary" data-modal-open="createUser"><i class="fas fa-plus"></i> Add user</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('users.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search name or phone…">
+            </div>
+            <select name="role" data-autosubmit>
+                <option value="all">All roles</option>
+                {% for r in roles %}<option value="{{ r }}" {{ 'selected' if role == r }}>{{ r | pretty }}</option>{% endfor %}
+            </select>
+            <select name="status" data-autosubmit>
+                <option value="all">All statuses</option>
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>{% endfor %}
+            </select>
+            <select name="plan" data-autosubmit>
+                <option value="all">All plans</option>
+                {% for p in plans %}<option value="{{ p }}" {{ 'selected' if plan == p }}>{{ p | pretty }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+            {% if search or role != 'all' or status != 'all' or plan != 'all' %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('users.index') }}">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>User</th><th>Role</th><th>Plan</th><th>XP / Streak</th>
+                    <th>Status</th><th>Joined</th><th class="actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <div class="user-info">
+                            {{ avatar(user.full_name or '?', user.avatar_url) }}
+                            <div>
+                                <a class="link" href="{{ url_for('users.detail', user_id=user.id) }}">
+                                    {{ user.full_name or 'Unnamed user' }}</a>
+                                <div class="muted">{{ user.email or user.phone or '—' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ status_badge(user.role) }}</td>
+                    <td>{{ user.plan_type | pretty }}</td>
+                    <td class="muted">
+                        <i class="fas fa-star" style="color:#f59e0b"></i> {{ user.xp or 0 }}
+                        &nbsp;<i class="fas fa-fire" style="color:#ef4444"></i> {{ user.streak_days or 0 }}
+                    </td>
+                    <td>{{ status_badge(user.status) }}</td>
+                    <td class="muted">{{ user.created_at | date }}</td>
+                    <td class="actions">
+                        <a class="icon-btn" href="{{ url_for('users.detail', user_id=user.id) }}" title="Open"><i class="fas fa-up-right-from-square"></i></a>
+                        {% if (user.status or '') | lower == 'active' %}
+                            {{ action_form(url_for('users.set_status', user_id=user.id), csrf_token, '',
+                                           'fas fa-ban', 'icon-btn danger',
+                                           'Block ' ~ (user.full_name or 'this user') ~ '?', {'status': 'blocked'}) }}
+                        {% else %}
+                            {{ action_form(url_for('users.set_status', user_id=user.id), csrf_token, '',
+                                           'fas fa-circle-check', 'icon-btn', '', {'status': 'active'}) }}
+                        {% endif %}
+                        {{ action_form(url_for('users.delete', user_id=user.id), csrf_token, '',
+                                       'fas fa-trash', 'icon-btn danger',
+                                       'Delete ' ~ (user.full_name or 'this user') ~ ' and all their data? This cannot be undone.') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">{{ empty_state('No users match these filters.', 'fas fa-users') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'users.index', {'q': search, 'role': role, 'status': status, 'plan': plan}) }}
+    </div>
+</div>
+
+{% call modal('createUser', 'Add a new user') %}
+<form method="post" action="{{ url_for('users.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field-row">
+        <div class="field">
+            <label for="full_name">Full name</label>
+            <input type="text" id="full_name" name="full_name" required>
+        </div>
+        <div class="field">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone">
+        </div>
+    </div>
+    <div class="field-row">
+        <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div class="field">
+            <label for="password">Temporary password</label>
+            <input type="text" id="password" name="password" minlength="6" required>
+        </div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label for="role">Role</label>{{ select('role', roles, 'student') }}</div>
+        <div class="field"><label for="plan_type">Plan</label>{{ select('plan_type', plans, 'trial') }}</div>
+        <div class="field"><label for="status">Status</label>{{ select('status', statuses, 'active') }}</div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create user</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

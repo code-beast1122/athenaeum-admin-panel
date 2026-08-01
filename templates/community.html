@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, avatar, empty_state, select %}
+
+{% block title %}Community · Athenaeum Admin{% endblock %}
+{% block heading %}Community{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Community Moderation</h1>
+        <p>{{ total }} post(s) · {{ pending }} awaiting approval.</p>
+    </div>
+    <div class="page-actions">
+        {% if pending %}
+        <a class="btn btn-warning" href="{{ url_for('community.index', approved='false') }}">
+            <i class="fas fa-clock"></i> Review {{ pending }} pending</a>
+        {% endif %}
+        <button class="btn btn-primary" data-modal-open="createPost"><i class="fas fa-bullhorn"></i> New post</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('community.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search posts…">
+            </div>
+            <select name="category" data-autosubmit>
+                <option value="all">All categories</option>
+                {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category == c }}>{{ c | pretty }}</option>{% endfor %}
+            </select>
+            <select name="approved" data-autosubmit>
+                <option value="all">All posts</option>
+                <option value="false" {{ 'selected' if approved == 'false' }}>Pending approval</option>
+                <option value="true" {{ 'selected' if approved == 'true' }}>Approved</option>
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush">
+        {% for post in posts %}
+        <div class="post-item">
+            <div class="post-header">
+                <div class="user-info">
+                    {{ avatar(post.author_name or '?', post.author_avatar) }}
+                    <div>
+                        <a class="link" href="{{ url_for('community.detail', post_id=post.id) }}">
+                            {{ post.author_name or 'Unknown' }}</a>
+                        <div class="muted">{{ post.author_role | pretty }} · {{ post.created_at | datetime }}</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:.4rem;align-items:center">
+                    {% if post.is_pinned %}<span class="badge badge-info">Pinned</span>{% endif %}
+                    <span class="badge badge-neutral">{{ post.category | pretty }}</span>
+                    <span class="badge {{ 'badge-success' if post.is_approved else 'badge-warning' }}">
+                        {{ 'Approved' if post.is_approved else 'Pending' }}</span>
+                </div>
+            </div>
+            <div class="post-body">
+                <p>{{ post.content | truncate(400) }}</p>
+                {% if post.image_url %}
+                <img src="{{ post.image_url }}" alt="" style="max-width:340px;border-radius:10px">
+                {% endif %}
+            </div>
+            <div class="post-actions">
+                <span class="muted"><i class="fas fa-heart"></i> {{ post.likes_count or 0 }}
+                    &nbsp;<i class="fas fa-comment"></i> {{ post.comments_count or 0 }}</span>
+                {% if post.is_approved %}
+                    {{ action_form(url_for('community.approve', post_id=post.id), csrf_token, 'Hide',
+                                   'fas fa-eye-slash', 'btn btn-sm btn-warning', '', {'is_approved': ''}) }}
+                {% else %}
+                    {{ action_form(url_for('community.approve', post_id=post.id), csrf_token, 'Approve',
+                                   'fas fa-check', 'btn btn-sm btn-success', '', {'is_approved': '1'}) }}
+                {% endif %}
+                {{ action_form(url_for('community.pin', post_id=post.id), csrf_token,
+                               'Unpin' if post.is_pinned else 'Pin', 'fas fa-thumbtack', 'btn btn-sm btn-outline', '',
+                               {'is_pinned': '' if post.is_pinned else '1'}) }}
+                <a class="btn btn-sm btn-ghost" href="{{ url_for('community.detail', post_id=post.id) }}">
+                    <i class="fas fa-comments"></i> Comments</a>
+                {{ action_form(url_for('community.delete', post_id=post.id), csrf_token, 'Delete', 'fas fa-trash',
+                               'btn btn-sm btn-danger', 'Delete this post along with its comments and likes?') }}
+            </div>
+        </div>
+        {% else %}
+        {{ empty_state('No posts match these filters.', 'fas fa-comments') }}
+        {% endfor %}
+        {{ pagination(page, pages, 'community.index', {'q': search, 'category': category, 'approved': approved}) }}
+    </div>
+</div>
+
+{% call modal('createPost', 'Publish a post') %}
+<form method="post" action="{{ url_for('community.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Content</label><textarea name="content" required></textarea></div>
+    <div class="field-row">
+        <div class="field"><label for="category">Category</label>{{ select('category', categories, 'announcement') }}</div>
+        <div class="field"><label>Image URL</label><input type="url" name="image_url"></div>
+    </div>
+    <label class="checkbox"><input type="checkbox" name="is_pinned" value="1"> Pin to the top of the feed</label>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Publish</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

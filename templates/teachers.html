@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, status_badge, avatar, empty_state, select %}
+
+{% block title %}Teachers · Athenaeum Admin{% endblock %}
+{% block heading %}Teachers{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Teachers</h1>
+        <p>{{ total }} teacher(s) · {{ unassigned | length }} course(s) still without an instructor.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn btn-outline" data-modal-open="promoteTeacher"><i class="fas fa-user-tag"></i> Promote existing user</button>
+        <button class="btn btn-primary" data-modal-open="createTeacher"><i class="fas fa-plus"></i> Add teacher</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('teachers.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search teachers…">
+            </div>
+            <select name="status" data-autosubmit>
+                <option value="all">All statuses</option>
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Teacher</th><th>Courses</th><th>Students</th><th>Live classes</th>
+                    <th>Exams</th><th>Status</th><th class="actions">Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for t in teachers %}
+                <tr>
+                    <td><div class="user-info">{{ avatar(t.full_name or '?', t.avatar_url) }}
+                        <div>
+                            <a class="link" href="{{ url_for('teachers.detail', teacher_id=t.id) }}">
+                                {{ t.full_name or 'Unnamed teacher' }}</a>
+                            <div class="muted">{{ t.email or t.phone or '—' }}</div>
+                        </div></div></td>
+                    <td>{{ t.course_count }}
+                        <span class="muted">({{ t.published_count }} live)</span></td>
+                    <td>{{ t.student_count }}</td>
+                    <td>{{ t.class_count }}</td>
+                    <td>{{ t.exam_count }}</td>
+                    <td>{{ status_badge(t.status) }}</td>
+                    <td class="actions">
+                        <a class="icon-btn" href="{{ url_for('teachers.detail', teacher_id=t.id) }}" title="Open">
+                            <i class="fas fa-up-right-from-square"></i></a>
+                        {% if (t.status or '') | lower == 'active' %}
+                            {{ action_form(url_for('teachers.set_status', teacher_id=t.id), csrf_token, '',
+                                           'fas fa-ban', 'icon-btn danger',
+                                           'Block ' ~ (t.full_name or 'this teacher') ~ '?', {'status': 'blocked'}) }}
+                        {% else %}
+                            {{ action_form(url_for('teachers.set_status', teacher_id=t.id), csrf_token, '',
+                                           'fas fa-circle-check', 'icon-btn', '', {'status': 'active'}) }}
+                        {% endif %}
+                        {{ action_form(url_for('teachers.set_role', teacher_id=t.id), csrf_token, '',
+                                       'fas fa-user-minus', 'icon-btn danger',
+                                       'Demote ' ~ (t.full_name or 'this teacher') ~ ' back to student?',
+                                       {'role': 'student'}) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">{{ empty_state('No teachers match these filters.', 'fas fa-chalkboard-teacher') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'teachers.index', {'q': search, 'status': status}) }}
+    </div>
+</div>
+
+{% if unassigned %}
+<div class="widget">
+    <div class="widget-header"><h3>Courses without an instructor</h3></div>
+    <div class="widget-content flush">
+        {% for c in unassigned %}
+        <div class="list-row">
+            <div><a class="link" href="{{ url_for('courses.detail', course_id=c.id) }}">{{ c.title }}</a>
+                <div class="muted">{{ 'Published' if c.is_published else 'Draft' }}</div></div>
+            <span class="badge badge-warning">Unassigned</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% call modal('createTeacher', 'Add a teacher') %}
+<form method="post" action="{{ url_for('teachers.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field-row">
+        <div class="field"><label>Full name</label><input type="text" name="full_name" required></div>
+        <div class="field"><label>Phone</label><input type="text" name="phone"></div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label>Email</label><input type="email" name="email" required></div>
+        <div class="field"><label>Temporary password</label><input type="text" name="password" minlength="6" required></div>
+    </div>
+    <div class="field"><label for="course_id">Assign a course (optional)</label>
+        {{ select('course_id', unassigned, '', 'No course yet') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create teacher</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('promoteTeacher', 'Promote an existing account', 'sm') %}
+<form method="post" action="{{ url_for('teachers.promote') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="user_id">Account</label>
+        {{ select('user_id', candidates, '', 'Select an account…') }}</div>
+    <p class="muted">Their role changes to teacher; nothing else about the account changes.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Promote</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

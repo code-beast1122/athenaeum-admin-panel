@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import action_form, avatar, empty_state, select, modal %}
+
+{% block title %}Post · Athenaeum Admin{% endblock %}
+{% block heading %}Community post{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Post by {{ post.author_name }}</h1>
+        <p>{{ post.author_role | pretty }} · {{ post.created_at | datetime }} ·
+           {{ likes }} like(s) · {{ comments | length }} comment(s)</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="{{ url_for('community.index') }}"><i class="fas fa-arrow-left"></i> Back</a>
+        {% if post.is_approved %}
+            {{ action_form(url_for('community.approve', post_id=post.id), csrf_token, 'Hide', 'fas fa-eye-slash',
+                           'btn btn-warning', '', {'is_approved': ''}) }}
+        {% else %}
+            {{ action_form(url_for('community.approve', post_id=post.id), csrf_token, 'Approve', 'fas fa-check',
+                           'btn btn-success', '', {'is_approved': '1'}) }}
+        {% endif %}
+        {{ action_form(url_for('community.delete', post_id=post.id), csrf_token, 'Delete', 'fas fa-trash',
+                       'btn btn-danger', 'Delete this post along with its comments and likes?') }}
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="widget">
+        <div class="widget-header"><h3>Edit post</h3></div>
+        <div class="widget-content">
+            <form method="post" action="{{ url_for('community.update', post_id=post.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="field"><label>Content</label>
+                    <textarea name="content" required>{{ post.content }}</textarea></div>
+                <div class="field-row">
+                    <div class="field"><label for="category">Category</label>{{ select('category', categories, post.category) }}</div>
+                    <div class="field"><label>Image URL</label>
+                        <input type="url" name="image_url" value="{{ post.image_url or '' }}"></div>
+                </div>
+                <label class="checkbox"><input type="checkbox" name="is_pinned" value="1"
+                    {{ 'checked' if post.is_pinned }}> Pinned</label>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save post</button></div>
+            </form>
+            {% if post.image_url %}
+            <img src="{{ post.image_url }}" alt="" style="max-width:100%;border-radius:10px;margin-top:1rem">
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Comments</h3>
+            {% if likes %}
+            {{ action_form(url_for('community.clear_likes', post_id=post.id), csrf_token,
+                           likes ~ ' like(s)', 'fas fa-heart-crack', 'btn btn-ghost btn-sm',
+                           'Wipe all likes on this post and reset the counter to zero?') }}
+            {% endif %}
+        </div>
+        <div class="widget-content" style="border-bottom:1px solid var(--border-color)">
+            <form method="post" action="{{ url_for('community.create_comment', post_id=post.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="field" style="margin-bottom:.6rem">
+                    <label>Reply as {{ admin.name if admin else 'Admin' }}</label>
+                    <textarea name="content" required placeholder="Write a reply…" style="min-height:70px"></textarea>
+                </div>
+                <div class="form-actions" style="margin-top:0">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-reply"></i> Post reply</button>
+                </div>
+            </form>
+        </div>
+        <div class="widget-content flush">
+            {% for c in comments %}
+            <div class="list-row">
+                <div class="user-info">
+                    {{ avatar(c.author_name or '?') }}
+                    <div>
+                        <strong>{{ c.author_name }}</strong>
+                        <span class="badge badge-neutral">{{ c.author_role | pretty }}</span>
+                        <div class="muted">{{ c.content }}</div>
+                        <div class="muted">{{ c.created_at | datetime }}</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:.2rem">
+                    <button class="icon-btn" title="Edit" data-modal-open="editComment" data-edit-modal="editComment"
+                            data-action="{{ url_for('community.update_comment', post_id=post.id, comment_id=c.id) }}"
+                            data-row='{{ {"content": c.content} | tojson }}'>
+                        <i class="fas fa-pen"></i></button>
+                    {{ action_form(url_for('community.delete_comment', post_id=post.id, comment_id=c.id),
+                                   csrf_token, '', 'fas fa-trash', 'icon-btn danger', 'Delete this comment?') }}
+                </div>
+            </div>
+            {% else %}
+            {{ empty_state('No comments on this post.', 'fas fa-comment') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% call modal('editComment', 'Edit comment', 'sm') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Comment</label><textarea name="content" required></textarea></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import modal, action_form, status_badge, avatar, empty_state, select %}
+
+{% block title %}{{ teacher.full_name or 'Teacher' }} · Athenaeum Admin{% endblock %}
+{% block heading %}Teacher{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="user-info">
+        {{ avatar(teacher.full_name or '?', teacher.avatar_url, 'lg') }}
+        <div>
+            <h1>{{ teacher.full_name or 'Unnamed teacher' }}</h1>
+            <p>{{ teacher.email or '—' }} · {{ teacher.phone or 'no phone' }} · {{ status_badge(teacher.status) }}</p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="{{ url_for('teachers.index') }}"><i class="fas fa-arrow-left"></i> Back</a>
+        <a class="btn btn-ghost" href="{{ url_for('users.detail', user_id=teacher.id) }}">
+            <i class="fas fa-id-card"></i> Full profile</a>
+        <button class="btn btn-outline" data-modal-open="notifyTeacher"><i class="fas fa-paper-plane"></i> Notify</button>
+        {% if (teacher.status or '') | lower == 'active' %}
+            {{ action_form(url_for('teachers.set_status', teacher_id=teacher.id), csrf_token, 'Block', 'fas fa-ban',
+                           'btn btn-warning', 'Block this teacher?', {'status': 'blocked'}) }}
+        {% else %}
+            {{ action_form(url_for('teachers.set_status', teacher_id=teacher.id), csrf_token, 'Unblock',
+                           'fas fa-circle-check', 'btn btn-success', '', {'status': 'active'}) }}
+        {% endif %}
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon tone-indigo"><i class="fas fa-book-open"></i></div>
+        <div class="stat-details"><h3>Courses</h3><p class="stat-number">{{ courses | length }}</p></div></div>
+    <div class="stat-card"><div class="stat-icon tone-green"><i class="fas fa-user-graduate"></i></div>
+        <div class="stat-details"><h3>Students taught</h3><p class="stat-number">{{ student_total }}</p></div></div>
+    <div class="stat-card"><div class="stat-icon tone-blue"><i class="fas fa-video"></i></div>
+        <div class="stat-details"><h3>Live classes</h3><p class="stat-number">{{ classes | length }}</p></div></div>
+    <div class="stat-card"><div class="stat-icon tone-amber"><i class="fas fa-clipboard-list"></i></div>
+        <div class="stat-details"><h3>Exams</h3><p class="stat-number">{{ exams | length }}</p></div></div>
+</div>
+
+<div class="grid-2">
+    <div>
+        <div class="widget">
+            <div class="widget-header">
+                <h3>Courses taught</h3>
+                <button class="btn btn-outline btn-sm" data-modal-open="assignCourse">
+                    <i class="fas fa-plus"></i> Assign course</button>
+            </div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Course</th><th>Category</th><th>Students</th><th>Price</th>
+                        <th>Status</th><th class="actions"></th></tr></thead>
+                    <tbody>
+                        {% for c in courses %}
+                        <tr>
+                            <td><a class="link" href="{{ url_for('courses.detail', course_id=c.id) }}">{{ c.title }}</a></td>
+                            <td class="muted">{{ c.category | pretty }}</td>
+                            <td>{{ c.enrollment_count }}</td>
+                            <td>{{ c.price | money }}</td>
+                            <td><span class="badge {{ 'badge-success' if c.is_published else 'badge-warning' }}">
+                                {{ 'Published' if c.is_published else 'Draft' }}</span></td>
+                            <td class="actions">
+                                {{ action_form(url_for('teachers.unassign_course', teacher_id=teacher.id, course_id=c.id),
+                                               csrf_token, '', 'fas fa-link-slash', 'icon-btn danger',
+                                               'Remove this teacher from "' ~ c.title ~ '"?') }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6">{{ empty_state('No courses assigned yet.', 'fas fa-book-open') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Live classes</h3></div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Class</th><th>Course</th><th>Starts</th><th>Status</th></tr></thead>
+                    <tbody>
+                        {% for c in classes %}
+                        <tr>
+                            <td>{{ c.title }}<div class="muted">{{ c.subject }}</div></td>
+                            <td class="muted">{{ c.courses.title if c.courses else '—' }}</td>
+                            <td class="muted">{{ c.start_time | datetime }}</td>
+                            <td>{{ status_badge(c.status) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">{{ empty_state('No classes hosted yet.', 'fas fa-video') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Exams authored</h3></div>
+            <div class="widget-content flush">
+                {% for e in exams %}
+                <div class="list-row">
+                    <div><a class="link" href="{{ url_for('exams.detail', exam_id=e.id) }}">{{ e.title }}</a>
+                        <div class="muted">{{ e.courses.title if e.courses else 'No course' }} ·
+                            {{ e.total_marks or 0 }} marks</div></div>
+                    <span class="badge {{ 'badge-success' if e.is_published else 'badge-warning' }}">
+                        {{ 'Published' if e.is_published else 'Draft' }}</span>
+                </div>
+                {% else %}
+                {{ empty_state('No exams created.', 'fas fa-clipboard-list') }}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="widget">
+            <div class="widget-header"><h3>Account</h3></div>
+            <div class="widget-content">
+                <div class="meta-grid">
+                    <div class="meta-item"><label>Role</label><span>{{ teacher.role | pretty }}</span></div>
+                    <div class="meta-item"><label>Plan</label><span>{{ teacher.plan_type | pretty }}</span></div>
+                    <div class="meta-item"><label>Joined</label><span>{{ teacher.created_at | date }}</span></div>
+                    <div class="meta-item"><label>Last login</label><span>{{ teacher.last_login_date | date }}</span></div>
+                </div>
+                <div class="form-actions">
+                    {{ action_form(url_for('teachers.set_role', teacher_id=teacher.id), csrf_token,
+                                   'Demote to student', 'fas fa-user-minus', 'btn btn-outline btn-sm',
+                                   'Demote this teacher back to student?', {'role': 'student'}) }}
+                    {{ action_form(url_for('teachers.set_role', teacher_id=teacher.id), csrf_token,
+                                   'Make admin', 'fas fa-user-shield', 'btn btn-outline btn-sm',
+                                   'Give this account full admin rights?', {'role': 'admin'}) }}
+                </div>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Materials shared</h3></div>
+            <div class="widget-content flush">
+                {% for m in materials %}
+                <div class="list-row">
+                    <div><strong>{{ m.title }}</strong>
+                        <div class="muted">{{ m.material_type | pretty }} ·
+                            {{ m.courses.title if m.courses else 'No course' }}</div></div>
+                    {% if m.file_url or m.link_url %}
+                    <a class="icon-btn" href="{{ m.file_url or m.link_url }}" target="_blank" rel="noopener">
+                        <i class="fas fa-arrow-up-right-from-square"></i></a>
+                    {% endif %}
+                </div>
+                {% else %}
+                {{ empty_state('Nothing shared yet.', 'fas fa-file-lines') }}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Access codes redeemed</h3></div>
+            <div class="widget-content flush">
+                {% for c in codes %}
+                <div class="list-row">
+                    <strong style="letter-spacing:1px">{{ c.code }}</strong>
+                    <span class="muted">{{ c.courses.title if c.courses else 'Any course' }} · {{ c.used_at | date }}</span>
+                </div>
+                {% else %}
+                {{ empty_state('No code redeemed.', 'fas fa-key') }}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% call modal('assignCourse', 'Assign a course', 'sm') %}
+<form method="post" action="{{ url_for('teachers.assign_course', teacher_id=teacher.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="course_id">Course without an instructor</label>
+        {{ select('course_id', unassigned, '', 'Select a course…') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Assign</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('notifyTeacher', 'Send a notification', 'sm') %}
+<form method="post" action="{{ url_for('teachers.notify', teacher_id=teacher.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Message</label><textarea name="message" required></textarea></div>
+    <div class="field"><label for="type">Type</label>{{ select('type', ['info', 'success', 'warning', 'urgent'], 'info') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Send</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

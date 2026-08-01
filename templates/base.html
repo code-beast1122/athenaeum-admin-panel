@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Athenaeum Admin{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Athenaeum</h2>
+                <p>Admin Portal</p>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-section">Overview</li>
+                    <li class="{{ 'active' if request.blueprint == 'dashboard' }}">
+                        <a href="{{ url_for('dashboard.index') }}"><i class="fas fa-chart-pie"></i> Dashboard</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'reports' }}">
+                        <a href="{{ url_for('reports.index') }}"><i class="fas fa-chart-line"></i> Reports</a></li>
+
+                    <li class="nav-section">Academy</li>
+                    <li class="{{ 'active' if request.blueprint == 'users' }}">
+                        <a href="{{ url_for('users.index') }}"><i class="fas fa-users"></i> Users</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'teachers' }}">
+                        <a href="{{ url_for('teachers.index') }}"><i class="fas fa-chalkboard-teacher"></i> Teachers</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'courses' }}">
+                        <a href="{{ url_for('courses.index') }}"><i class="fas fa-book-open"></i> Courses</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'exams' }}">
+                        <a href="{{ url_for('exams.index') }}"><i class="fas fa-clipboard-list"></i> Exams</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'enrollments' }}">
+                        <a href="{{ url_for('enrollments.index') }}"><i class="fas fa-user-graduate"></i> Enrollments</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'payments' }}">
+                        <a href="{{ url_for('payments.index') }}"><i class="fas fa-receipt"></i> Payments</a></li>
+                    <li class="{{ 'active' if request.blueprint == 'live_classes' }}">
+                        <a href="{{ url_for('live_classes.index') }}"><i class="fas fa-video"></i> Live Classes</a></li>
+
+                    <li class="nav-section">Engagement</li>
+                    <li class="{{ 'active' if request.blueprint == 'community' }}">
+                        <a href="{{ url_for('community.index') }}"><i class="fas fa-comments"></i> Community</a></li>
+                    <li class="{{ 'active' if request.endpoint == 'communications.announcements' }}">
+                        <a href="{{ url_for('communications.announcements') }}"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+                    <li class="{{ 'active' if request.endpoint == 'communications.notifications' }}">
+                        <a href="{{ url_for('communications.notifications') }}"><i class="fas fa-bell"></i> Notifications</a></li>
+
+                    <li class="nav-section">Operations</li>
+                    <li class="{{ 'active' if request.endpoint == 'requests.trial_requests' }}">
+                        <a href="{{ url_for('requests.trial_requests') }}"><i class="fas fa-hand-holding-heart"></i> Trial Requests</a></li>
+                    <li class="{{ 'active' if request.endpoint == 'requests.access_codes' }}">
+                        <a href="{{ url_for('requests.access_codes') }}"><i class="fas fa-key"></i> Access Codes</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                {% if require_login %}
+                <form method="post" action="{{ url_for('auth.logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-ghost btn-block">
+                        <i class="fas fa-right-from-bracket"></i> Sign out
+                    </button>
+                </form>
+                {% else %}
+                <span class="muted"><i class="fas fa-laptop-code"></i> Local mode</span>
+                {% endif %}
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <button class="icon-btn sidebar-toggle" id="sidebarToggle" aria-label="Toggle navigation">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="top-title">{% block heading %}{% endblock %}</div>
+                <div class="top-actions">
+                    <a class="icon-btn" href="{{ url_for('communications.notifications') }}" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                    </a>
+                    <div class="user-profile">
+                        <span class="avatar avatar-sm">{{ (admin.name if admin else 'A') | initials }}</span>
+                        <div class="user-meta">
+                            <strong>{{ admin.name if admin else 'Admin' }}</strong>
+                            <small>{{ admin.email if admin else '' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-area">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                  <div class="flash-stack">
+                    {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">
+                      <span>{{ message }}</span>
+                      <button type="button" class="icon-btn" data-dismiss>&times;</button>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

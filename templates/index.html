@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stat_card, status_badge, avatar, empty_state, action_form %}
+
+{% block title %}Dashboard · Athenaeum Admin{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Dashboard Overview</h1>
+        <p>Live figures straight from the Athenaeum database.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('reports.index') }}"><i class="fas fa-chart-line"></i> Reports</a>
+        <a class="btn btn-primary" href="{{ url_for('communications.notifications') }}"><i class="fas fa-paper-plane"></i> Broadcast</a>
+    </div>
+</div>
+
+{% if warning %}
+<div class="flash flash-danger" style="margin-bottom:1.25rem"><span>{{ warning }}</span></div>
+{% endif %}
+
+<div class="stats-grid">
+    {{ stat_card('Total Users', stats.total_users, 'fas fa-users', 'indigo', stats.students ~ ' students · ' ~ stats.teachers ~ ' teachers') }}
+    {{ stat_card('Published Courses', stats.active_courses, 'fas fa-book-open', 'green', stats.draft_courses ~ ' in draft') }}
+    {{ stat_card('Enrollments', stats.enrollments, 'fas fa-user-graduate', 'amber', stats.paid_enrollments ~ ' paid') }}
+    {{ stat_card('Revenue', stats.revenue | money, 'fas fa-wallet', 'blue', 'From paid enrollments') }}
+    {{ stat_card('AI Interactions', stats.ai_interactions, 'fas fa-robot', 'pink', 'Questions + quizzes') }}
+    {{ stat_card('Pending Reviews', stats.pending_posts + stats.pending_trials, 'fas fa-inbox', 'red', stats.pending_posts ~ ' posts · ' ~ stats.pending_trials ~ ' trials') }}
+</div>
+
+{% if stats.pending_payments %}
+<div class="flash flash-warning" style="margin-bottom:1.25rem">
+    <span><i class="fas fa-receipt"></i>
+        {{ stats.pending_payments }} payment(s) waiting for your approval.</span>
+    <a class="btn btn-sm btn-warning" href="{{ url_for('payments.index') }}">Review now</a>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Enrollments &amp; sign-ups (14 days)</h3>
+        </div>
+        <div class="widget-content"><div class="chart-box"><canvas id="trendChart"></canvas></div></div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header"><h3>Users by role</h3></div>
+        <div class="widget-content"><div class="chart-box"><canvas id="roleChart"></canvas></div></div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Recent enrollments</h3>
+            <a class="view-all" href="{{ url_for('enrollments.index') }}">View all</a>
+        </div>
+        <div class="widget-content flush table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Student</th><th>Course</th><th>Date</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for e in recent_enrollments %}
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                {{ avatar(e.student.full_name or 'Unknown', e.student.avatar_url) }}
+                                <a class="link" href="{{ url_for('users.detail', user_id=e.student_id) }}">
+                                    {{ e.student.full_name or 'Unknown student' }}</a>
+                            </div>
+                        </td>
+                        <td>{{ e.courses.title if e.courses else '-' }}</td>
+                        <td class="muted">{{ e.enrolled_at | date }}</td>
+                        <td>{{ status_badge(e.payment_status) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">{{ empty_state('No enrollments yet.') }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header">
+            <h3>AI usage (7 days)</h3>
+        </div>
+        <div class="widget-content"><div class="chart-box"><canvas id="aiChart"></canvas></div></div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Upcoming live classes</h3>
+            <a class="view-all" href="{{ url_for('live_classes.index') }}">Manage</a>
+        </div>
+        <div class="widget-content flush">
+            {% for c in upcoming_classes %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ c.title }}</strong>
+                    <div class="muted">{{ c.teacher_name }} · {{ c.courses.title if c.courses else 'No course' }}</div>
+                </div>
+                <div style="text-align:right">
+                    <div class="muted">{{ c.start_time | datetime }}</div>
+                    {{ status_badge(c.status) }}
+                </div>
+            </div>
+            {% else %}
+            {{ empty_state('Nothing scheduled.', 'fas fa-video') }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Pending trial requests</h3>
+            <a class="view-all" href="{{ url_for('requests.trial_requests') }}">Manage</a>
+        </div>
+        <div class="widget-content flush">
+            {% for r in trial_requests %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ r.full_name }}</strong>
+                    <div class="muted">{{ r.course_name }} · {{ r.phone }}</div>
+                </div>
+                {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
+                               'Contacted', 'fas fa-check', 'btn btn-sm btn-success', '',
+                               {'status': 'contacted'}) }}
+            </div>
+            {% else %}
+            {{ empty_state('No pending requests.', 'fas fa-hand-holding-heart') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+fetch("{{ url_for('dashboard.charts') }}")
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (data.error) return;
+    var short = data.labels.map(function (d) { return d.slice(5); });
+
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: short,
+        datasets: [
+          { label: 'Enrollments', data: data.enrollments, borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.18)', fill: true, tension: 0.35 },
+          { label: 'Sign-ups', data: data.signups, borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.14)', fill: true, tension: 0.35 }
+        ]
+      },
+      options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+
+    new Chart(document.getElementById('roleChart'), {
+      type: 'doughnut',
+      data: {
+        labels: data.roles.labels,
+        datasets: [{ data: data.roles.values,
+          backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#38bdf8', '#f87171'] }]
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    new Chart(document.getElementById('aiChart'), {
+      type: 'bar',
+      data: {
+        labels: data.ai.labels.map(function (d) { return d.slice(5); }),
+        datasets: [
+          { label: 'Questions', data: data.ai.questions, backgroundColor: '#6366f1', borderRadius: 5 },
+          { label: 'Quizzes', data: data.ai.quizzes, backgroundColor: '#ec4899', borderRadius: 5 }
+        ]
+      },
+      options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+  });
+</script>
+{% endblock %}

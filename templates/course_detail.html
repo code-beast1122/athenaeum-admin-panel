@@ -1,0 +1,341 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import modal, action_form, status_badge, avatar, empty_state, select %}
+
+{% block title %}{{ course.title }} · Athenaeum Admin{% endblock %}
+{% block heading %}Course{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ course.title }}</h1>
+        <p>{{ course.category | pretty }} · {{ modules | length }} module(s) · {{ lesson_count }} lesson(s) ·
+           {{ enrollments | length }} student(s)</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="{{ url_for('courses.index') }}"><i class="fas fa-arrow-left"></i> Back</a>
+        {{ action_form(url_for('courses.toggle_publish', course_id=course.id), csrf_token,
+                       'Unpublish' if course.is_published else 'Publish',
+                       'fas fa-eye-slash' if course.is_published else 'fas fa-eye',
+                       'btn btn-outline', '', {'is_published': '' if course.is_published else '1'}) }}
+        {{ action_form(url_for('courses.delete', course_id=course.id), csrf_token, 'Delete', 'fas fa-trash',
+                       'btn btn-danger', 'Delete this course and all its content?') }}
+    </div>
+</div>
+
+<div class="tab-scope">
+<div class="tabs">
+    <button class="tab active" data-tab="details">Details</button>
+    <button class="tab" data-tab="curriculum">Curriculum</button>
+    <button class="tab" data-tab="students">Students ({{ enrollments | length }})</button>
+    <button class="tab" data-tab="exams">Exams ({{ exams | length }})</button>
+    <button class="tab" data-tab="materials">Materials ({{ materials | length }})</button>
+    <button class="tab" data-tab="classes">Live classes ({{ classes | length }})</button>
+</div>
+
+<!-- Details ------------------------------------------------------------- -->
+<div class="tab-panel" data-tab-panel="details">
+    <div class="widget">
+        <div class="widget-header"><h3>Course details</h3></div>
+        <div class="widget-content">
+            <form method="post" action="{{ url_for('courses.update', course_id=course.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="field"><label for="title">Title</label>
+                    <input type="text" id="title" name="title" value="{{ course.title }}" required></div>
+                <div class="field"><label for="description">Description</label>
+                    <textarea id="description" name="description">{{ course.description or '' }}</textarea></div>
+                <div class="field-row">
+                    <div class="field"><label for="category">Category</label>{{ select('category', categories, course.category) }}</div>
+                    <div class="field"><label for="subject">Subject</label>
+                        <input type="text" id="subject" name="subject" value="{{ course.subject or '' }}"></div>
+                    <div class="field"><label for="price">Price</label>
+                        <input type="number" step="0.01" id="price" name="price" value="{{ course.price or 0 }}"></div>
+                </div>
+                <div class="field"><label for="instructor_id">Instructor</label>
+                    {{ select('instructor_id', instructors, course.instructor_id, 'No instructor') }}</div>
+                <div class="field"><label for="thumbnail_url">Thumbnail URL</label>
+                    <input type="url" id="thumbnail_url" name="thumbnail_url" value="{{ course.thumbnail_url or '' }}"></div>
+                <div class="field"><label for="what_you_will_learn">What students will learn (one per line)</label>
+                    <textarea id="what_you_will_learn" name="what_you_will_learn">{{ (course.what_you_will_learn or []) | join('\n') }}</textarea></div>
+                <div class="field-row">
+                    <label class="checkbox"><input type="checkbox" name="is_published" value="1"
+                        {{ 'checked' if course.is_published }}> Published</label>
+                    <label class="checkbox"><input type="checkbox" name="is_free_preview" value="1"
+                        {{ 'checked' if course.is_free_preview }}> Free preview</label>
+                </div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Curriculum ---------------------------------------------------------- -->
+<div class="tab-panel" data-tab-panel="curriculum" hidden>
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Modules &amp; lessons</h3>
+            <button class="btn btn-primary btn-sm" data-modal-open="createModule"><i class="fas fa-plus"></i> Add module</button>
+        </div>
+        <div class="widget-content flush">
+            {% for module in modules %}
+            <div class="post-item">
+                <div class="post-header">
+                    <div>
+                        <strong>{{ module.order_index }}. {{ module.title }}</strong>
+                        <div class="muted">{{ module.lessons | length }} lesson(s)</div>
+                    </div>
+                    <div class="post-actions">
+                        <button class="btn btn-outline btn-sm" data-modal-open="createLesson"
+                                data-edit-modal="createLesson"
+                                data-action="{{ url_for('courses.create_lesson', course_id=course.id, module_id=module.id) }}">
+                            <i class="fas fa-plus"></i> Lesson</button>
+                        <button class="icon-btn" data-modal-open="editModule" data-edit-modal="editModule"
+                                data-action="{{ url_for('courses.update_module', course_id=course.id, module_id=module.id) }}"
+                                data-row='{{ {"title": module.title, "order_index": module.order_index} | tojson }}'>
+                            <i class="fas fa-pen"></i></button>
+                        {{ action_form(url_for('courses.delete_module', course_id=course.id, module_id=module.id),
+                                       csrf_token, '', 'fas fa-trash', 'icon-btn danger',
+                                       'Delete this module and its lessons?') }}
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <tbody>
+                            {% for lesson in module.lessons %}
+                            <tr>
+                                <td style="width:40px" class="muted">{{ lesson.order_index }}</td>
+                                <td>{{ lesson.title }}
+                                    {% if lesson.is_free_preview %}<span class="badge badge-info">Preview</span>{% endif %}</td>
+                                <td class="muted">{{ lesson.duration_minutes or 0 }} min</td>
+                                <td class="muted">
+                                    {% if lesson.video_url %}
+                                    <a class="link" href="{{ lesson.video_url }}" target="_blank" rel="noopener">
+                                        <i class="fas fa-play"></i> Video</a>
+                                    {% else %}No video{% endif %}
+                                </td>
+                                <td class="actions">
+                                    <button class="icon-btn" data-modal-open="editLesson" data-edit-modal="editLesson"
+                                            data-action="{{ url_for('courses.update_lesson', course_id=course.id, lesson_id=lesson.id) }}"
+                                            data-row='{{ {"title": lesson.title, "video_url": lesson.video_url, "duration_minutes": lesson.duration_minutes, "order_index": lesson.order_index, "is_free_preview": lesson.is_free_preview} | tojson }}'>
+                                        <i class="fas fa-pen"></i></button>
+                                    {{ action_form(url_for('courses.delete_lesson', course_id=course.id, lesson_id=lesson.id),
+                                                   csrf_token, '', 'fas fa-trash', 'icon-btn danger', 'Delete this lesson?') }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td class="muted" colspan="5">No lessons in this module yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            {{ empty_state('No modules yet - add the first one to build the curriculum.', 'fas fa-layer-group') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Students ------------------------------------------------------------ -->
+<div class="tab-panel" data-tab-panel="students" hidden>
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Enrolled students</h3>
+            <a class="btn btn-outline btn-sm" href="{{ url_for('enrollments.index', course_id=course.id) }}">
+                Open in enrollments</a>
+        </div>
+        <div class="widget-content flush table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Student</th><th>Progress</th><th>Payment</th><th>Transaction</th>
+                    <th>Enrolled</th><th class="actions"></th></tr></thead>
+                <tbody>
+                    {% for e in enrollments %}
+                    <tr>
+                        <td>
+                            <div class="user-info">{{ avatar(e.student.full_name or '?', e.student.avatar_url) }}
+                                <a class="link" href="{{ url_for('users.detail', user_id=e.student_id) }}">
+                                    {{ e.student.full_name or 'Unknown' }}</a></div>
+                        </td>
+                        <td>
+                            <div class="user-info">
+                                <div class="progress"><span style="width: {{ e.progress.percent }}%"></span></div>
+                                <span class="muted">{{ e.progress.completed }}/{{ e.progress.total }}</span>
+                            </div>
+                        </td>
+                        <td>{{ status_badge(e.payment_status) }}</td>
+                        <td class="muted">{{ e.transaction_id or '—' }}</td>
+                        <td class="muted">{{ e.enrolled_at | date }}</td>
+                        <td class="actions">
+                            {{ action_form(url_for('enrollments.delete', enrollment_id=e.id), csrf_token, '',
+                                           'fas fa-trash', 'icon-btn danger', 'Remove this enrollment?') }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6">{{ empty_state('Nobody has enrolled yet.', 'fas fa-user-graduate') }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Exams --------------------------------------------------------------- -->
+<div class="tab-panel" data-tab-panel="exams" hidden>
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Exams for this course</h3>
+            <a class="btn btn-outline btn-sm" href="{{ url_for('exams.index', course_id=course.id) }}">Manage exams</a>
+        </div>
+        <div class="widget-content flush">
+            {% for exam in exams %}
+            <div class="list-row">
+                <div>
+                    <a class="link" href="{{ url_for('exams.detail', exam_id=exam.id) }}">{{ exam.title }}</a>
+                    <div class="muted">{{ exam.duration_minutes }} min · {{ exam.total_marks }} marks</div>
+                </div>
+                <span class="badge {{ 'badge-success' if exam.is_published else 'badge-warning' }}">
+                    {{ 'Published' if exam.is_published else 'Draft' }}</span>
+            </div>
+            {% else %}
+            {{ empty_state('No exams linked to this course.', 'fas fa-clipboard-list') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Materials ----------------------------------------------------------- -->
+<div class="tab-panel" data-tab-panel="materials" hidden>
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Course materials</h3>
+            <button class="btn btn-primary btn-sm" data-modal-open="createMaterial"><i class="fas fa-plus"></i> Add material</button>
+        </div>
+        <div class="widget-content flush">
+            {% for m in materials %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ m.title }}</strong>
+                    {% if m.is_pinned %}<span class="badge badge-info">Pinned</span>{% endif %}
+                    <div class="muted">{{ m.material_type | pretty }} · {{ m.teacher_name }} · {{ m.created_at | date }}</div>
+                    {% if m.description %}<div class="muted">{{ m.description }}</div>{% endif %}
+                </div>
+                <div class="post-actions">
+                    {% if m.file_url or m.link_url %}
+                    <a class="btn btn-ghost btn-sm" href="{{ m.file_url or m.link_url }}" target="_blank" rel="noopener">
+                        <i class="fas fa-arrow-up-right-from-square"></i> Open</a>
+                    {% endif %}
+                    {{ action_form(url_for('courses.delete_material', course_id=course.id, material_id=m.id),
+                                   csrf_token, '', 'fas fa-trash', 'icon-btn danger', 'Delete this material?') }}
+                </div>
+            </div>
+            {% else %}
+            {{ empty_state('No materials uploaded.', 'fas fa-file-lines') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Live classes -------------------------------------------------------- -->
+<div class="tab-panel" data-tab-panel="classes" hidden>
+    <div class="widget">
+        <div class="widget-header">
+            <h3>Live classes</h3>
+            <a class="btn btn-outline btn-sm" href="{{ url_for('live_classes.index', course_id=course.id) }}">Schedule</a>
+        </div>
+        <div class="widget-content flush">
+            {% for c in classes %}
+            <div class="list-row">
+                <div><strong>{{ c.title }}</strong>
+                    <div class="muted">{{ c.teacher_name }} · {{ c.start_time | datetime }}</div></div>
+                {{ status_badge(c.status) }}
+            </div>
+            {% else %}
+            {{ empty_state('No classes scheduled.', 'fas fa-video') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</div>
+
+{% call modal('createModule', 'Add a module', 'sm') %}
+<form method="post" action="{{ url_for('courses.create_module', course_id=course.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="module_title">Title</label>
+        <input type="text" id="module_title" name="title" required></div>
+    <div class="field"><label for="module_order">Order</label>
+        <input type="number" id="module_order" name="order_index" value="{{ (modules | length) + 1 }}"></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add module</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('editModule', 'Edit module', 'sm') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Order</label><input type="number" name="order_index"></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('createLesson', 'Add a lesson') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Video URL</label><input type="url" name="video_url"></div>
+    <div class="field-row">
+        <div class="field"><label>Duration (minutes)</label><input type="number" name="duration_minutes" value="0"></div>
+        <div class="field"><label>Order</label><input type="number" name="order_index"></div>
+    </div>
+    <label class="checkbox"><input type="checkbox" name="is_free_preview" value="1"> Free preview lesson</label>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add lesson</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('editLesson', 'Edit lesson') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Video URL</label><input type="url" name="video_url"></div>
+    <div class="field-row">
+        <div class="field"><label>Duration (minutes)</label><input type="number" name="duration_minutes"></div>
+        <div class="field"><label>Order</label><input type="number" name="order_index"></div>
+    </div>
+    <label class="checkbox"><input type="checkbox" name="is_free_preview" value="1"> Free preview lesson</label>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save lesson</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('createMaterial', 'Add course material') %}
+<form method="post" action="{{ url_for('courses.create_material', course_id=course.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Description</label><textarea name="description"></textarea></div>
+    <div class="field-row">
+        <div class="field"><label for="material_type">Type</label>{{ select('material_type', material_types, 'pdf') }}</div>
+        <div class="field"><label for="teacher_id">Teacher</label>{{ select('teacher_id', instructors, course.instructor_id, 'Admin') }}</div>
+    </div>
+    <div class="field"><label>Teacher name (shown to students)</label>
+        <input type="text" name="teacher_name" value="{{ course.profiles.full_name if course.profiles else 'Athenaeum' }}"></div>
+    <div class="field-row">
+        <div class="field"><label>File URL</label><input type="url" name="file_url"></div>
+        <div class="field"><label>Link URL</label><input type="url" name="link_url"></div>
+    </div>
+    <label class="checkbox"><input type="checkbox" name="is_pinned" value="1"> Pin to the top</label>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add material</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

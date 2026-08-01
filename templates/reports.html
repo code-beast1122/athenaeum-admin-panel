@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stat_card, empty_state, avatar %}
+
+{% block title %}Reports · Athenaeum Admin{% endblock %}
+{% block heading %}Reports{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Reports &amp; Analytics</h1>
+        <p>Revenue, engagement and performance across the academy.</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    {{ stat_card('Revenue', summary.total_revenue | money, 'fas fa-wallet', 'green', 'Paid + active enrollments') }}
+    {{ stat_card('Published courses', summary.published, 'fas fa-book-open', 'indigo') }}
+    {{ stat_card('Exam attempts', summary.attempts, 'fas fa-clipboard-check', 'amber',
+                 'Average ' ~ summary.avg_score ~ '%') }}
+    {{ stat_card('AI interactions', summary.ai_total, 'fas fa-robot', 'pink') }}
+</div>
+
+<div class="grid-half">
+    <div class="widget">
+        <div class="widget-header"><h3>Top courses by revenue</h3></div>
+        <div class="widget-content flush table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Course</th><th>Category</th><th>Students</th><th>Revenue</th></tr></thead>
+                <tbody>
+                    {% for c in top_courses %}
+                    <tr>
+                        <td>{{ c.title }}</td>
+                        <td class="muted">{{ c.category | pretty }}</td>
+                        <td>{{ c.count }}</td>
+                        <td><strong>{{ c.revenue | money }}</strong></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">{{ empty_state('No enrollment data yet.', 'fas fa-chart-column') }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header"><h3>Course mix</h3></div>
+        <div class="widget-content"><div class="chart-box-sm"><canvas id="categoryChart"></canvas></div></div>
+    </div>
+</div>
+
+<div class="grid-half">
+    <div class="widget">
+        <div class="widget-header"><h3>XP leaderboard</h3></div>
+        <div class="widget-content flush">
+            {% for s in leaderboard %}
+            <div class="list-row">
+                <div class="user-info">
+                    <span class="muted">#{{ loop.index }}</span>
+                    {{ avatar(s.full_name or '?') }}
+                    <a class="link" href="{{ url_for('users.detail', user_id=s.id) }}">{{ s.full_name or 'Unnamed' }}</a>
+                </div>
+                <div><strong>{{ s.xp or 0 }}</strong> <span class="muted">XP · {{ s.streak_days or 0 }}d streak</span></div>
+            </div>
+            {% else %}
+            {{ empty_state('No students yet.', 'fas fa-trophy') }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="widget">
+        <div class="widget-header"><h3>Heaviest AI users</h3></div>
+        <div class="widget-content flush">
+            {% for row in top_ai %}
+            <div class="list-row">
+                <div class="user-info">{{ avatar(row.name) }}<span>{{ row.name }}</span></div>
+                <strong>{{ row.total }}</strong>
+            </div>
+            {% else %}
+            {{ empty_state('No AI usage recorded.', 'fas fa-robot') }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header"><h3>Data exports</h3></div>
+    <div class="widget-content">
+        <p class="muted" style="margin-bottom:1rem">Download any table as CSV for accounting or offline analysis.</p>
+        <div class="toolbar">
+            {% for name in exportable %}
+            <a class="btn btn-outline btn-sm" href="{{ url_for('reports.export', table_name=name) }}">
+                <i class="fas fa-download"></i> {{ name | pretty }}</a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+fetch("{{ url_for('dashboard.charts') }}")
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (data.error) return;
+    new Chart(document.getElementById('categoryChart'), {
+      type: 'polarArea',
+      data: {
+        labels: data.categories.labels,
+        datasets: [{ data: data.categories.values,
+          backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#38bdf8', '#f87171', '#a78bfa'] }]
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+  });
+</script>
+{% endblock %}

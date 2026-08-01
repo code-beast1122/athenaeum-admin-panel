@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, action_form, avatar, empty_state, stat_card %}
+
+{% block title %}Carts · Athenaeum Admin{% endblock %}
+{% block heading %}Abandoned Carts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Abandoned Carts</h1>
+        <p>{{ total }} item(s) sitting in baskets · {{ value | money }} not yet converted.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="{{ url_for('payments.index') }}"><i class="fas fa-arrow-left"></i> Payments</a>
+        {{ action_form(url_for('payments.purge_enrolled_carts'), csrf_token, 'Clear stale items',
+                       'fas fa-broom', 'btn btn-outline',
+                       'Remove basket items for courses the student already enrolled in?') }}
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header"><h3>Basket contents</h3></div>
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Student</th><th>Course</th><th>Price</th><th>Added</th>
+                <th>State</th><th class="actions">Actions</th></tr></thead>
+            <tbody>
+                {% for i in items %}
+                <tr>
+                    <td><div class="user-info">{{ avatar(i.student.full_name or '?', i.student.avatar_url) }}
+                        <a class="link" href="{{ url_for('users.detail', user_id=i.user_id) }}">
+                            {{ i.student.full_name or 'Unknown' }}</a></div></td>
+                    <td>{% if i.courses %}
+                            <a class="link" href="{{ url_for('courses.detail', course_id=i.course_id) }}">{{ i.courses.title }}</a>
+                        {% else %}<span class="muted">Deleted course</span>{% endif %}</td>
+                    <td>{{ (i.courses.price if i.courses else 0) | money }}</td>
+                    <td class="muted">{{ i.added_at | date }}</td>
+                    <td>{% if i.already_enrolled %}<span class="badge badge-neutral">Already enrolled</span>
+                        {% else %}<span class="badge badge-warning">Not converted</span>{% endif %}</td>
+                    <td class="actions">
+                        {% if not i.already_enrolled %}
+                        {{ action_form(url_for('payments.convert_cart', item_id=i.id), csrf_token,
+                                       'Start enrollment', 'fas fa-cart-arrow-down', 'btn btn-sm btn-success',
+                                       'Create a pending enrollment for this basket item and notify the student?') }}
+                        {% endif %}
+                        {{ action_form(url_for('payments.delete_cart', item_id=i.id), csrf_token, '',
+                                       'fas fa-trash', 'icon-btn danger', 'Remove this basket item?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">{{ empty_state('No items in any basket.', 'fas fa-cart-shopping') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'payments.carts', {}) }}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, empty_state, select %}
+
+{% block title %}Courses · Athenaeum Admin{% endblock %}
+{% block heading %}Courses{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Course Management</h1>
+        <p>{{ total }} course(s) across O-Levels, A-Levels, Matric and skills.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('reports.export', table_name='courses') }}">
+            <i class="fas fa-download"></i> Export CSV</a>
+        <button class="btn btn-primary" data-modal-open="createCourse"><i class="fas fa-plus"></i> Create course</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('courses.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search courses…">
+            </div>
+            <select name="category" data-autosubmit>
+                <option value="all">All categories</option>
+                {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category == c }}>{{ c | pretty }}</option>{% endfor %}
+            </select>
+            <select name="published" data-autosubmit>
+                <option value="all">Published &amp; draft</option>
+                <option value="true" {{ 'selected' if published == 'true' }}>Published</option>
+                <option value="false" {{ 'selected' if published == 'false' }}>Draft</option>
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+</div>
+
+<div class="card-grid">
+    {% for course in courses %}
+    <div class="course-card">
+        <div class="course-thumbnail" style="background-image: url('{{ course.thumbnail_url or 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?auto=format&fit=crop&q=80&w=400' }}')">
+            <span class="badge {{ 'badge-success' if course.is_published else 'badge-warning' }} status-badge">
+                {{ 'Published' if course.is_published else 'Draft' }}</span>
+        </div>
+        <div class="course-content">
+            <span class="category-tag">{{ course.category | pretty }}</span>
+            <h3>{{ course.title }}</h3>
+            <div class="course-meta">
+                <span><i class="fas fa-chalkboard-teacher"></i>
+                    {{ course.profiles.full_name if course.profiles else 'No instructor' }}</span>
+                <span><i class="fas fa-users"></i> {{ course.enrollment_count }}</span>
+                <span><i class="fas fa-tag"></i> {{ course.price | money }}</span>
+            </div>
+            <div class="course-actions">
+                <a class="btn btn-outline btn-sm" href="{{ url_for('courses.detail', course_id=course.id) }}">
+                    <i class="fas fa-pen"></i> Manage</a>
+                <div style="display:flex;gap:.25rem">
+                    {{ action_form(url_for('courses.toggle_publish', course_id=course.id), csrf_token, '',
+                                   'fas fa-eye-slash' if course.is_published else 'fas fa-eye',
+                                   'icon-btn', '', {'is_published': '' if course.is_published else '1'}) }}
+                    {{ action_form(url_for('courses.delete', course_id=course.id), csrf_token, '',
+                                   'fas fa-trash', 'icon-btn danger',
+                                   'Delete "' ~ course.title ~ '" and all its modules, lessons and enrollments?') }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="widget" style="grid-column: 1 / -1">{{ empty_state('No courses match these filters.', 'fas fa-book-open') }}</div>
+    {% endfor %}
+</div>
+
+{{ pagination(page, pages, 'courses.index', {'q': search, 'category': category, 'published': published}) }}
+
+{% call modal('createCourse', 'Create a course') %}
+<form method="post" action="{{ url_for('courses.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" required></div>
+    <div class="field"><label for="description">Description</label><textarea id="description" name="description"></textarea></div>
+    <div class="field-row">
+        <div class="field"><label for="category">Category</label>{{ select('category', categories, 'o_levels') }}</div>
+        <div class="field"><label for="subject">Subject</label><input type="text" id="subject" name="subject"></div>
+        <div class="field"><label for="price">Price</label><input type="number" step="0.01" id="price" name="price" value="0"></div>
+    </div>
+    <div class="field"><label for="instructor_id">Instructor</label>
+        {{ select('instructor_id', instructors, '', 'No instructor') }}</div>
+    <div class="field"><label for="thumbnail_url">Thumbnail URL</label><input type="url" id="thumbnail_url" name="thumbnail_url"></div>
+    <div class="field"><label for="what_you_will_learn">What students will learn (one per line)</label>
+        <textarea id="what_you_will_learn" name="what_you_will_learn"></textarea></div>
+    <div class="field-row">
+        <label class="checkbox"><input type="checkbox" name="is_published" value="1"> Publish immediately</label>
+        <label class="checkbox"><input type="checkbox" name="is_free_preview" value="1"> Offer free preview</label>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create course</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

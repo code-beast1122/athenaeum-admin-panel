@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, avatar, empty_state, select %}
+
+{% block title %}Notifications · Athenaeum Admin{% endblock %}
+{% block heading %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Notifications</h1>
+        <p>{{ total }} delivered · {{ unread }} still unread.</p>
+    </div>
+    <div class="page-actions">
+        {{ action_form(url_for('communications.purge_read'), csrf_token, 'Clear read', 'fas fa-broom',
+                       'btn btn-outline', 'Permanently delete every notification that has been read?') }}
+        <button class="btn btn-primary" data-modal-open="broadcast"><i class="fas fa-paper-plane"></i> Broadcast</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('communications.notifications') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search notifications…">
+            </div>
+            <select name="read" data-autosubmit>
+                <option value="all">Read &amp; unread</option>
+                <option value="false" {{ 'selected' if read == 'false' }}>Unread</option>
+                <option value="true" {{ 'selected' if read == 'true' }}>Read</option>
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Recipient</th><th>Notification</th><th>Type</th><th>Read</th><th>Sent</th><th class="actions"></th></tr></thead>
+            <tbody>
+                {% for n in notifications %}
+                <tr>
+                    <td><div class="user-info">{{ avatar(n.user.full_name or '?', n.user.avatar_url) }}
+                        <a class="link" href="{{ url_for('users.detail', user_id=n.user_id) }}">
+                            {{ n.user.full_name or 'Unknown' }}</a></div></td>
+                    <td><strong>{{ n.title }}</strong><div class="muted">{{ n.message | truncate(80) }}</div></td>
+                    <td><span class="badge badge-neutral">{{ n.type | pretty }}</span></td>
+                    <td>{% if n.is_read %}<span class="badge badge-success">Read</span>
+                        {% else %}<span class="badge badge-warning">Unread</span>{% endif %}</td>
+                    <td class="muted">{{ n.created_at | datetime }}</td>
+                    <td class="actions">
+                        {% if n.is_read %}
+                        {{ action_form(url_for('communications.toggle_read', notification_id=n.id), csrf_token,
+                                       '', 'fas fa-envelope', 'icon-btn', '', {'is_read': ''}) }}
+                        {% else %}
+                        {{ action_form(url_for('communications.toggle_read', notification_id=n.id), csrf_token,
+                                       '', 'fas fa-envelope-open', 'icon-btn', '', {'is_read': '1'}) }}
+                        {% endif %}
+                        {{ action_form(url_for('communications.delete_notification', notification_id=n.id),
+                                       csrf_token, '', 'fas fa-trash', 'icon-btn danger', 'Delete this notification?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">{{ empty_state('Nothing to show.', 'fas fa-bell') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'communications.notifications', {'q': search, 'read': read}) }}
+    </div>
+</div>
+
+{% call modal('broadcast', 'Broadcast a notification') %}
+<form method="post" action="{{ url_for('communications.broadcast') }}"
+      data-confirm="Send this notification to everyone in the selected audience?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field"><label>Message</label><textarea name="message" required></textarea></div>
+    <div class="field-row">
+        <div class="field"><label for="target">Audience</label>{{ select('target', targets, 'all') }}</div>
+        <div class="field"><label for="type">Type</label>{{ select('type', types, 'info') }}</div>
+    </div>
+    <p class="muted">One notification row is created per matching user.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Send</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

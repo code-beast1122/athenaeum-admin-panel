@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, empty_state, select %}
+
+{% block title %}Access Codes · Athenaeum Admin{% endblock %}
+{% block heading %}Access Codes{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Teacher Access Codes</h1>
+        <p>{{ total }} code(s) · {{ available }} still available to hand out.</p>
+    </div>
+    <div class="page-actions">
+        {{ action_form(url_for('requests.purge_used'), csrf_token, 'Clear used', 'fas fa-broom',
+                       'btn btn-outline', 'Delete every code that has already been redeemed?') }}
+        <button class="btn btn-primary" data-modal-open="generateCodes"><i class="fas fa-key"></i> Generate codes</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('requests.access_codes') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search a code…">
+            </div>
+            <select name="course_id" data-autosubmit>
+                <option value="all">All courses</option>
+                {% for c in courses %}<option value="{{ c.id }}" {{ 'selected' if course_id == c.id }}>{{ c.title }}</option>{% endfor %}
+            </select>
+            <select name="used" data-autosubmit>
+                <option value="all">All codes</option>
+                <option value="false" {{ 'selected' if used == 'false' }}>Available</option>
+                <option value="true" {{ 'selected' if used == 'true' }}>Redeemed</option>
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Code</th><th>Course</th><th>Status</th><th>Redeemed by</th>
+                <th>Created</th><th class="actions">Actions</th></tr></thead>
+            <tbody>
+                {% for c in codes %}
+                <tr>
+                    <td><strong style="letter-spacing:1px">{{ c.code }}</strong></td>
+                    <td>{{ c.courses.title if c.courses else 'Any course' }}</td>
+                    <td>{% if c.is_used %}<span class="badge badge-neutral">Redeemed</span>
+                        {% else %}<span class="badge badge-success">Available</span>{% endif %}</td>
+                    <td class="muted">
+                        {% if c.used_by %}
+                        <a class="link" href="{{ url_for('users.detail', user_id=c.used_by) }}">
+                            {{ c.user.full_name or 'Unknown' }}</a>
+                        <div>{{ c.used_at | date }}</div>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="muted">{{ c.created_at | date }}</td>
+                    <td class="actions">
+                        {% if c.is_used %}
+                        {{ action_form(url_for('requests.reset_code', code_id=c.id), csrf_token, '',
+                                       'fas fa-rotate-left', 'icon-btn', 'Make this code available again?') }}
+                        {% endif %}
+                        {{ action_form(url_for('requests.delete_code', code_id=c.id), csrf_token, '',
+                                       'fas fa-trash', 'icon-btn danger', 'Delete this code?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">{{ empty_state('No access codes match these filters.', 'fas fa-key') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'requests.access_codes', {'q': search, 'course_id': course_id, 'used': used}) }}
+    </div>
+</div>
+
+{% call modal('generateCodes', 'Generate access codes', 'sm') %}
+<form method="post" action="{{ url_for('requests.generate_codes') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="quantity">How many? (max 50)</label>
+        <input type="number" id="quantity" name="quantity" value="5" min="1" max="50"></div>
+    <div class="field"><label for="course_id">Course</label>{{ select('course_id', courses, '', 'Any course') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Generate</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

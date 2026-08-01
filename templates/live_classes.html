@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, status_badge, empty_state, select %}
+
+{% block title %}Live Classes · Athenaeum Admin{% endblock %}
+{% block heading %}Live Classes{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Live Classes</h1>
+        <p>{{ total }} session(s) · Jitsi rooms are generated automatically.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('reports.export', table_name='live_classes') }}">
+            <i class="fas fa-download"></i> Export CSV</a>
+        <button class="btn btn-primary" data-modal-open="createClass"><i class="fas fa-video"></i> Schedule class</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('live_classes.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search title, subject or teacher…">
+            </div>
+            <select name="course_id" data-autosubmit>
+                <option value="all">All courses</option>
+                {% for c in courses %}<option value="{{ c.id }}" {{ 'selected' if course_id == c.id }}>{{ c.title }}</option>{% endfor %}
+            </select>
+            <select name="status" data-autosubmit>
+                <option value="all">All statuses</option>
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Class</th><th>Course</th><th>Teacher</th><th>Starts</th><th>Ends</th>
+                    <th>Status</th><th class="actions">Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for c in classes %}
+                <tr>
+                    <td><strong>{{ c.title }}</strong>
+                        <div class="muted">{{ c.subject }} · room {{ c.jitsi_room_name | truncate(28) }}</div></td>
+                    <td>{{ c.courses.title if c.courses else '—' }}</td>
+                    <td>{{ c.teacher_name }}</td>
+                    <td class="muted">{{ c.start_time | datetime }}</td>
+                    <td class="muted">{{ c.end_time | datetime }}</td>
+                    <td>{{ status_badge(c.status) }}</td>
+                    <td class="actions">
+                        <a class="icon-btn" title="Open room" target="_blank" rel="noopener"
+                           href="https://meet.jit.si/{{ c.jitsi_room_name }}"><i class="fas fa-door-open"></i></a>
+                        {% if c.status != 'live' %}
+                        {{ action_form(url_for('live_classes.set_status', class_id=c.id), csrf_token, '',
+                                       'fas fa-play', 'icon-btn', '', {'status': 'live'}) }}
+                        {% endif %}
+                        {% if c.status != 'ended' %}
+                        {{ action_form(url_for('live_classes.set_status', class_id=c.id), csrf_token, '',
+                                       'fas fa-stop', 'icon-btn', '', {'status': 'ended'}) }}
+                        {% endif %}
+                        <button class="icon-btn" data-modal-open="editClass" data-edit-modal="editClass"
+                                data-action="{{ url_for('live_classes.update', class_id=c.id) }}"
+                                data-row='{{ {"title": c.title, "subject": c.subject, "teacher_name": c.teacher_name, "teacher_id": c.teacher_id, "course_id": c.course_id, "description": c.description, "start_time": c.start_time | form_datetime, "end_time": c.end_time | form_datetime, "status": c.status} | tojson }}'>
+                            <i class="fas fa-pen"></i></button>
+                        {{ action_form(url_for('live_classes.delete', class_id=c.id), csrf_token, '',
+                                       'fas fa-trash', 'icon-btn danger', 'Delete this live class?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">{{ empty_state('No classes match these filters.', 'fas fa-video') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'live_classes.index', {'q': search, 'course_id': course_id, 'status': status}) }}
+    </div>
+</div>
+
+{% call modal('createClass', 'Schedule a live class') %}
+<form method="post" action="{{ url_for('live_classes.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field-row">
+        <div class="field"><label for="course_id">Course</label>{{ select('course_id', courses, '', 'No course') }}</div>
+        <div class="field"><label>Subject</label><input type="text" name="subject" value="General"></div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label for="teacher_id">Teacher</label>{{ select('teacher_id', teachers, '', 'Unassigned') }}</div>
+        <div class="field"><label>Teacher name (shown to students)</label>
+            <input type="text" name="teacher_name" value="Athenaeum"></div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label>Starts</label><input type="datetime-local" name="start_time" required></div>
+        <div class="field"><label>Ends</label><input type="datetime-local" name="end_time" required></div>
+    </div>
+    <div class="field"><label>Description</label><textarea name="description"></textarea></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Schedule</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('editClass', 'Edit live class') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="field-row">
+        <div class="field"><label>Course</label>
+            <select name="course_id"><option value="">No course</option>
+                {% for c in courses %}<option value="{{ c.id }}">{{ c.title }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Subject</label><input type="text" name="subject"></div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label>Teacher</label>
+            <select name="teacher_id"><option value="">Unassigned</option>
+                {% for t in teachers %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Teacher name</label><input type="text" name="teacher_name"></div>
+    </div>
+    <div class="field-row">
+        <div class="field"><label>Starts</label><input type="datetime-local" name="start_time"></div>
+        <div class="field"><label>Ends</label><input type="datetime-local" name="end_time"></div>
+    </div>
+    <div class="field"><label>Status</label>
+        <select name="status">{% for s in statuses %}<option value="{{ s }}">{{ s | pretty }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Description</label><textarea name="description"></textarea></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, status_badge, avatar, empty_state, stat_card, select %}
+
+{% block title %}Payments · Athenaeum Admin{% endblock %}
+{% block heading %}Payments{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Payment Approvals</h1>
+        <p>Verify the reference a student submitted, then approve or reject the enrollment.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('payments.carts') }}">
+            <i class="fas fa-cart-shopping"></i> Abandoned carts</a>
+        <a class="btn btn-outline" href="{{ url_for('payments.export', status=status) }}">
+            <i class="fas fa-download"></i> Export CSV</a>
+        {% if summary.pending_count %}
+        {{ action_form(url_for('payments.approve_all'), csrf_token,
+                       'Approve all pending', 'fas fa-check-double', 'btn btn-success',
+                       'Approve all ' ~ summary.pending_count | int ~ ' pending payment(s)? Each student is notified.') }}
+        {% endif %}
+    </div>
+</div>
+
+<div class="stats-grid">
+    {{ stat_card('Awaiting approval', summary.pending_count | int, 'fas fa-hourglass-half', 'amber',
+                 summary.pending_value | money ~ ' held up') }}
+    {{ stat_card('Approved payments', summary.approved_count | int, 'fas fa-circle-check', 'green') }}
+    {{ stat_card('Approved revenue', summary.approved_value | money, 'fas fa-wallet', 'indigo') }}
+    {{ stat_card('This month', summary.month_value | money, 'fas fa-calendar-day', 'blue') }}
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('payments.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search student name…">
+            </div>
+            <select name="status" data-autosubmit>
+                <option value="all" {{ 'selected' if status == 'all' }}>All payments</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>
+                {% endfor %}
+            </select>
+            <select name="course_id" data-autosubmit>
+                <option value="all">All courses</option>
+                {% for c in courses %}<option value="{{ c.id }}" {{ 'selected' if course_id == c.id }}>{{ c.title }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Student</th><th>Course</th><th>Amount</th><th>Reference</th>
+                    <th>Submitted</th><th>Status</th><th class="actions">Decision</th></tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td><div class="user-info">{{ avatar(p.student.full_name or '?', p.student.avatar_url) }}
+                        <a class="link" href="{{ url_for('users.detail', user_id=p.student_id) }}">
+                            {{ p.student.full_name or 'Unknown student' }}</a></div></td>
+                    <td>{% if p.courses %}
+                            <a class="link" href="{{ url_for('courses.detail', course_id=p.course_id) }}">{{ p.courses.title }}</a>
+                            <div class="muted">{{ p.courses.category | pretty }}</div>
+                        {% else %}<span class="muted">Deleted course</span>{% endif %}</td>
+                    <td><strong>{{ (p.courses.price if p.courses else 0) | money }}</strong></td>
+                    <td>
+                        <form method="post" action="{{ url_for('payments.set_reference', enrollment_id=p.id) }}"
+                              style="display:flex;gap:.3rem;align-items:center">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="text" name="transaction_id" value="{{ p.transaction_id or '' }}"
+                                   placeholder="No reference" style="width:150px">
+                            <button class="icon-btn" type="submit" title="Save reference"><i class="fas fa-floppy-disk"></i></button>
+                        </form>
+                    </td>
+                    <td class="muted">{{ p.enrolled_at | date }}</td>
+                    <td>{{ status_badge(p.payment_status) }}</td>
+                    <td class="actions">
+                        {% if (p.payment_status or '') | lower == 'pending' %}
+                            {{ action_form(url_for('payments.approve', enrollment_id=p.id), csrf_token,
+                                           'Approve', 'fas fa-check', 'btn btn-sm btn-success', '',
+                                           {'upgrade_plan': '1'}) }}
+                            <button class="btn btn-sm btn-danger" data-modal-open="rejectPayment"
+                                    data-edit-modal="rejectPayment"
+                                    data-action="{{ url_for('payments.reject', enrollment_id=p.id) }}">
+                                <i class="fas fa-xmark"></i> Reject</button>
+                        {% else %}
+                            {{ action_form(url_for('payments.revert', enrollment_id=p.id), csrf_token,
+                                           'Move to pending', 'fas fa-rotate-left', 'btn btn-sm btn-outline',
+                                           'Put this payment back in the approval queue?') }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">
+                    {{ empty_state('Nothing waiting for approval.' if status == 'pending'
+                                   else 'No payments match these filters.', 'fas fa-receipt') }}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'payments.index', {'q': search, 'status': status, 'course_id': course_id}) }}
+    </div>
+</div>
+
+{% call modal('rejectPayment', 'Reject this payment', 'sm') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p class="muted" style="margin-bottom:1rem">
+        The enrollment is removed, so the student loses access to the course, and they are
+        notified with the reason below.
+    </p>
+    <div class="field"><label>Reason (sent to the student)</label>
+        <input type="text" name="reason" placeholder="e.g. No matching transaction found."></div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-danger">Reject &amp; remove</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

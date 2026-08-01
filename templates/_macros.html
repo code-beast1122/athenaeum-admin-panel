@@ -1,0 +1,123 @@
+{# Reusable building blocks shared by every page. #}
+
+{% macro pagination(page, pages, endpoint, args={}) %}
+  {% if pages > 1 %}
+  <nav class="pagination">
+    {% set window = range([1, page - 2] | max, [pages, page + 2] | min + 1) %}
+    <a class="page-link {{ 'disabled' if page <= 1 }}"
+       href="{{ url_for(endpoint, page=page-1, **args) }}">&laquo; Prev</a>
+    {% if window[0] > 1 %}
+      <a class="page-link" href="{{ url_for(endpoint, page=1, **args) }}">1</a>
+      <span class="page-gap">…</span>
+    {% endif %}
+    {% for p in window %}
+      <a class="page-link {{ 'current' if p == page }}"
+         href="{{ url_for(endpoint, page=p, **args) }}">{{ p }}</a>
+    {% endfor %}
+    {% if window[-1] < pages %}
+      <span class="page-gap">…</span>
+      <a class="page-link" href="{{ url_for(endpoint, page=pages, **args) }}">{{ pages }}</a>
+    {% endif %}
+    <a class="page-link {{ 'disabled' if page >= pages }}"
+       href="{{ url_for(endpoint, page=page+1, **args) }}">Next &raquo;</a>
+  </nav>
+  {% endif %}
+{% endmacro %}
+
+
+{% macro modal(id, title, size='md') %}
+<div class="modal" id="{{ id }}" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel modal-{{ size }}">
+    <div class="modal-head">
+      <h3>{{ title }}</h3>
+      <button type="button" class="icon-btn" data-modal-close aria-label="Close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{# A one-click POST (approve, publish, delete...) carrying the CSRF token. #}
+{% macro action_form(action, csrf, label, icon='', klass='btn btn-ghost', confirm='', fields={}) %}
+<form method="post" action="{{ action }}" class="inline-form"
+      {% if confirm %}data-confirm="{{ confirm }}"{% endif %}>
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  {% for name, value in fields.items() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  <button type="submit" class="{{ klass }}" title="{{ label }}">
+    {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+    {% if label %}<span>{{ label }}</span>{% endif %}
+  </button>
+</form>
+{% endmacro %}
+
+
+{% macro stat_card(label, value, icon, tone='indigo', hint='') %}
+<div class="stat-card">
+  <div class="stat-icon tone-{{ tone }}"><i class="{{ icon }}"></i></div>
+  <div class="stat-details">
+    <h3>{{ label }}</h3>
+    <p class="stat-number">{{ value }}</p>
+    {% if hint %}<span class="stat-hint">{{ hint }}</span>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro badge(text, tone='neutral') %}
+<span class="badge badge-{{ tone }}">{{ text }}</span>
+{% endmacro %}
+
+
+{% macro status_badge(value) %}
+  {% set v = (value or '') | lower %}
+  {% if v in ['active', 'paid', 'published', 'converted', 'approved', 'live'] %}
+    {{ badge(value | pretty, 'success') }}
+  {% elif v in ['pending', 'trial', 'draft', 'scheduled', 'contacted'] %}
+    {{ badge(value | pretty, 'warning') }}
+  {% elif v in ['blocked', 'suspended', 'rejected', 'expired', 'ended'] %}
+    {{ badge(value | pretty, 'danger') }}
+  {% else %}
+    {{ badge(value | pretty or '-', 'neutral') }}
+  {% endif %}
+{% endmacro %}
+
+
+{% macro avatar(name, url='', size='sm') %}
+  {% if url %}
+    <img class="avatar avatar-{{ size }}" src="{{ url }}" alt="{{ name }}">
+  {% else %}
+    <span class="avatar avatar-{{ size }}">{{ name | initials }}</span>
+  {% endif %}
+{% endmacro %}
+
+
+{% macro empty_state(message, icon='fas fa-inbox') %}
+<div class="empty-state">
+  <i class="{{ icon }}"></i>
+  <p>{{ message }}</p>
+</div>
+{% endmacro %}
+
+
+{% macro select(name, options, selected, blank_label='', blank_value='') %}
+<select name="{{ name }}" id="{{ name }}" class="input">
+  {% if blank_label %}<option value="{{ blank_value }}">{{ blank_label }}</option>{% endif %}
+  {% for option in options %}
+    {% if option is mapping %}
+      <option value="{{ option.id }}" {{ 'selected' if option.id == selected }}>
+        {{ option.full_name or option.title or option.id }}
+      </option>
+    {% else %}
+      <option value="{{ option }}" {{ 'selected' if option == selected }}>{{ option | pretty }}</option>
+    {% endif %}
+  {% endfor %}
+</select>
+{% endmacro %}

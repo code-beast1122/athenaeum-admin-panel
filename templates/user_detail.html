@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import action_form, status_badge, avatar, empty_state, select, modal %}
+
+{% block title %}{{ user.full_name or 'User' }} · Athenaeum Admin{% endblock %}
+{% block heading %}User profile{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="user-info">
+        {{ avatar(user.full_name or '?', user.avatar_url, 'lg') }}
+        <div>
+            <h1>{{ user.full_name or 'Unnamed user' }}</h1>
+            <p>{{ user.email or '—' }} · {{ status_badge(user.role) }} {{ status_badge(user.status) }}</p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="{{ url_for('users.index') }}"><i class="fas fa-arrow-left"></i> Back</a>
+        <button class="btn btn-outline" data-modal-open="notifyUser"><i class="fas fa-paper-plane"></i> Notify</button>
+        <button class="btn btn-outline" data-modal-open="resetPassword"><i class="fas fa-key"></i> Reset password</button>
+        {% if (user.status or '') | lower == 'active' %}
+            {{ action_form(url_for('users.set_status', user_id=user.id), csrf_token, 'Block', 'fas fa-ban',
+                           'btn btn-warning', 'Block this user?', {'status': 'blocked'}) }}
+        {% else %}
+            {{ action_form(url_for('users.set_status', user_id=user.id), csrf_token, 'Unblock', 'fas fa-circle-check',
+                           'btn btn-success', '', {'status': 'active'}) }}
+        {% endif %}
+        {{ action_form(url_for('users.delete', user_id=user.id), csrf_token, 'Delete', 'fas fa-trash',
+                       'btn btn-danger', 'Delete this user and all their data? This cannot be undone.') }}
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon tone-amber"><i class="fas fa-star"></i></div>
+        <div class="stat-details"><h3>XP</h3><p class="stat-number">{{ user.xp or 0 }}</p></div></div>
+    <div class="stat-card"><div class="stat-icon tone-red"><i class="fas fa-fire"></i></div>
+        <div class="stat-details"><h3>Streak</h3><p class="stat-number">{{ user.streak_days or 0 }}</p>
+        <span class="stat-hint">days</span></div></div>
+    <div class="stat-card"><div class="stat-icon tone-green"><i class="fas fa-book"></i></div>
+        <div class="stat-details"><h3>Enrollments</h3><p class="stat-number">{{ enrollments | length }}</p></div></div>
+    <div class="stat-card"><div class="stat-icon tone-pink"><i class="fas fa-robot"></i></div>
+        <div class="stat-details"><h3>AI usage</h3><p class="stat-number">{{ ai_total }}</p>
+        <span class="stat-hint">questions + quizzes</span></div></div>
+</div>
+
+<div class="grid-2">
+    <div>
+        <div class="widget">
+            <div class="widget-header"><h3>Profile</h3></div>
+            <div class="widget-content">
+                <form method="post" action="{{ url_for('users.update', user_id=user.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="field-row">
+                        <div class="field"><label for="full_name">Full name</label>
+                            <input type="text" id="full_name" name="full_name" value="{{ user.full_name or '' }}"></div>
+                        <div class="field"><label for="phone">Phone</label>
+                            <input type="text" id="phone" name="phone" value="{{ user.phone or '' }}"></div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label for="role">Role</label>{{ select('role', roles, (user.role or '') | lower) }}</div>
+                        <div class="field"><label for="plan_type">Plan</label>{{ select('plan_type', plans, user.plan_type) }}</div>
+                        <div class="field"><label for="status">Status</label>{{ select('status', statuses, user.status) }}</div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label for="xp">XP</label>
+                            <input type="number" id="xp" name="xp" value="{{ user.xp or 0 }}"></div>
+                        <div class="field"><label for="streak_days">Streak days</label>
+                            <input type="number" id="streak_days" name="streak_days" value="{{ user.streak_days or 0 }}"></div>
+                    </div>
+                    <div class="field"><label for="avatar_url">Avatar URL</label>
+                        <input type="url" id="avatar_url" name="avatar_url" value="{{ user.avatar_url or '' }}"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header">
+                <h3>Enrollments</h3>
+                <button class="btn btn-outline btn-sm" data-modal-open="enrollUser"><i class="fas fa-plus"></i> Enrol</button>
+            </div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Course</th><th>Status</th><th>Enrolled</th><th class="actions"></th></tr></thead>
+                    <tbody>
+                        {% for e in enrollments %}
+                        <tr>
+                            <td><a class="link" href="{{ url_for('courses.detail', course_id=e.course_id) }}">
+                                {{ e.courses.title if e.courses else 'Deleted course' }}</a></td>
+                            <td>{{ status_badge(e.payment_status) }}</td>
+                            <td class="muted">{{ e.enrolled_at | date }}</td>
+                            <td class="actions">
+                                {{ action_form(url_for('enrollments.delete', enrollment_id=e.id), csrf_token, '',
+                                               'fas fa-trash', 'icon-btn danger', 'Remove this enrollment?') }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">{{ empty_state('Not enrolled in any course.', 'fas fa-book') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header">
+                <h3>Course progress</h3>
+                <span class="muted">{{ progress.total_completed }} lesson(s) completed ·
+                    {{ progress.xp_awarded }} XP-awarded</span>
+            </div>
+            <div class="widget-content" style="border-bottom:1px solid var(--border-color);padding-bottom:1rem">
+                <form method="post" action="{{ url_for('users.complete_course', user_id=user.id) }}"
+                      class="toolbar" data-confirm="Mark every lesson in this course complete for this student?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <select name="course_id" style="width:auto;min-width:200px">
+                        <option value="">Select a course…</option>
+                        {% for c in courses %}<option value="{{ c.id }}">{{ c.title }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-outline btn-sm">
+                        <i class="fas fa-check-double"></i> Mark course complete</button>
+                </form>
+            </div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Course</th><th>Lessons</th><th>Progress</th>
+                        <th>Last activity</th><th class="actions"></th></tr></thead>
+                    <tbody>
+                        {% for p in progress.courses %}
+                        <tr>
+                            <td><a class="link" href="{{ url_for('courses.detail', course_id=p.course_id) }}">
+                                {{ p.title }}</a></td>
+                            <td class="muted">{{ p.completed }} / {{ p.total }}</td>
+                            <td>
+                                <div class="user-info">
+                                    <div class="progress"><span style="width: {{ p.percent }}%"></span></div>
+                                    <span class="muted">{{ p.percent }}%</span>
+                                </div>
+                            </td>
+                            <td class="muted">{{ p.last_activity | date if p.last_activity else 'Not started' }}</td>
+                            <td class="actions">
+                                {% if p.completed %}
+                                {{ action_form(url_for('users.reset_progress', user_id=user.id), csrf_token, '',
+                                               'fas fa-rotate-left', 'icon-btn danger',
+                                               'Clear this student\'s progress for "' ~ p.title ~ '"?',
+                                               {'course_id': p.course_id}) }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5">{{ empty_state('No lesson activity yet.', 'fas fa-list-check') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Exam results</h3></div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Exam</th><th>Score</th><th>Percentage</th><th>Completed</th></tr></thead>
+                    <tbody>
+                        {% for r in results %}
+                        <tr>
+                            <td>{{ r.exams.title if r.exams else '—' }}</td>
+                            <td>{{ r.score }} / {{ r.total_marks }}</td>
+                            <td>
+                                <div class="user-info">
+                                    <div class="progress"><span style="width: {{ r.percentage or 0 }}%"></span></div>
+                                    <span class="muted">{{ r.percentage or 0 }}%</span>
+                                </div>
+                            </td>
+                            <td class="muted">{{ r.completed_at | date }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">{{ empty_state('No exam attempts yet.', 'fas fa-clipboard-list') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="widget">
+            <div class="widget-header"><h3>Account</h3></div>
+            <div class="widget-content">
+                <div class="meta-grid">
+                    <div class="meta-item"><label>User ID</label><span class="muted" style="font-size:.75rem">{{ user.id }}</span></div>
+                    <div class="meta-item"><label>Joined</label><span>{{ user.created_at | date }}</span></div>
+                    <div class="meta-item"><label>Trial ends</label><span>{{ user.trial_end | date }}</span></div>
+                    <div class="meta-item"><label>Last login</label><span>{{ user.last_login_date | date }}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Award XP</h3></div>
+            <div class="widget-content">
+                <form method="post" action="{{ url_for('users.award_xp', user_id=user.id) }}" class="field-row">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="field" style="margin:0">
+                        <input type="number" name="amount" value="50" placeholder="Amount (negative to deduct)">
+                    </div>
+                    <button type="submit" class="btn btn-outline">Apply</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header">
+                <h3>Family links</h3>
+                <button class="btn btn-outline btn-sm" data-modal-open="linkChild">
+                    <i class="fas fa-link"></i> Link child</button>
+            </div>
+            <div class="widget-content flush">
+                {% if parent %}
+                <div class="list-row">
+                    <div class="user-info">{{ avatar(parent.full_name or '?', parent.avatar_url) }}
+                        <div><a class="link" href="{{ url_for('users.detail', user_id=parent.id) }}">
+                            {{ parent.full_name or 'Unnamed' }}</a>
+                        <div class="muted">Parent of this account</div></div></div>
+                    <span class="badge badge-info">Parent</span>
+                </div>
+                {% endif %}
+
+                {% for link in links %}
+                <div class="list-row">
+                    <div class="user-info">{{ avatar(link.student.full_name or '?', link.student.avatar_url) }}
+                        <div>
+                            <a class="link" href="{{ url_for('users.detail', user_id=link.student_id) }}">
+                                {{ link.student.full_name or 'Unknown student' }}</a>
+                            <div class="muted">Linked {{ link.linked_at | date }}</div>
+                        </div></div>
+                    <div style="display:flex;gap:.3rem;align-items:center">
+                        {% if link.is_verified %}
+                            {{ action_form(url_for('users.verify_link', user_id=user.id, link_id=link.id),
+                                           csrf_token, 'Verified', 'fas fa-circle-check',
+                                           'btn btn-sm btn-success', '', {'is_verified': ''}) }}
+                        {% else %}
+                            {{ action_form(url_for('users.verify_link', user_id=user.id, link_id=link.id),
+                                           csrf_token, 'Unverified', 'fas fa-circle-question',
+                                           'btn btn-sm btn-warning', '', {'is_verified': '1'}) }}
+                        {% endif %}
+                        {{ action_form(url_for('users.unlink_child', user_id=user.id, link_id=link.id),
+                                       csrf_token, '', 'fas fa-link-slash', 'icon-btn danger',
+                                       'Remove this parent-child link?') }}
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% for link in parent_of_links %}
+                <div class="list-row">
+                    <div class="user-info">{{ avatar(link.parent.full_name or '?', link.parent.avatar_url) }}
+                        <div><a class="link" href="{{ url_for('users.detail', user_id=link.parent_id) }}">
+                            {{ link.parent.full_name or 'Unknown parent' }}</a>
+                        <div class="muted">Watches this student</div></div></div>
+                    <span class="badge badge-neutral">Guardian</span>
+                </div>
+                {% endfor %}
+
+                {% for child in children %}
+                {% if child.id not in links | map(attribute='student_id') | list %}
+                <div class="list-row">
+                    <div class="user-info">{{ avatar(child.full_name or '?', child.avatar_url) }}
+                        <div><a class="link" href="{{ url_for('users.detail', user_id=child.id) }}">
+                            {{ child.full_name }}</a>
+                        <div class="muted">From profile parent_id only</div></div></div>
+                    {{ status_badge(child.status) }}
+                </div>
+                {% endif %}
+                {% endfor %}
+
+                {% if not parent and not links and not parent_of_links and not children %}
+                {{ empty_state('No family links.', 'fas fa-people-roof') }}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header">
+                <h3>AI usage</h3>
+                <button class="btn btn-outline btn-sm" data-modal-open="editAiUsage">
+                    <i class="fas fa-sliders"></i> Adjust</button>
+            </div>
+            <div class="widget-content flush table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Date</th><th>Questions</th><th>Quizzes</th><th class="actions"></th></tr></thead>
+                    <tbody>
+                        {% for row in ai_rows[:10] %}
+                        <tr><td class="muted">{{ row.usage_date | date }}</td>
+                            <td>{{ row.questions_used or 0 }}</td><td>{{ row.quizzes_used or 0 }}</td>
+                            <td class="actions">
+                                {{ action_form(url_for('users.set_ai_usage', user_id=user.id), csrf_token, '',
+                                               'fas fa-eraser', 'icon-btn danger',
+                                               'Clear this day and reset the quota?',
+                                               {'clear': '1', 'row_id': row.id}) }}
+                            </td></tr>
+                        {% else %}
+                        <tr><td colspan="4">{{ empty_state('No AI usage recorded.', 'fas fa-robot') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Cart</h3></div>
+            <div class="widget-content" style="border-bottom:1px solid var(--border-color)">
+                <form method="post" action="{{ url_for('users.add_cart_item', user_id=user.id) }}" class="toolbar">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <select name="course_id" style="width:auto;min-width:180px">
+                        <option value="">Add a course…</option>
+                        {% for c in courses %}<option value="{{ c.id }}">{{ c.title }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-outline btn-sm"><i class="fas fa-cart-plus"></i> Add</button>
+                </form>
+            </div>
+            <div class="widget-content flush">
+                {% for item in cart %}
+                <div class="list-row">
+                    <div><strong>{{ item.courses.title if item.courses else 'Deleted course' }}</strong>
+                        <div class="muted">{{ (item.courses.price if item.courses else 0) | money }} ·
+                            added {{ item.added_at | date }}</div></div>
+                    {{ action_form(url_for('users.delete_cart_item', user_id=user.id, item_id=item.id),
+                                   csrf_token, '', 'fas fa-trash', 'icon-btn danger', 'Remove from cart?') }}
+                </div>
+                {% else %}
+                {{ empty_state('Cart is empty.', 'fas fa-cart-shopping') }}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header"><h3>Recent notifications</h3></div>
+            <div class="widget-content flush">
+                {% for n in notifications[:8] %}
+                <div class="list-row">
+                    <div><strong>{{ n.title }}</strong><div class="muted">{{ n.message | truncate(70) }}</div></div>
+                    <span class="muted">{{ n.created_at | date }}</span>
+                </div>
+                {% else %}
+                {{ empty_state('Nothing sent yet.', 'fas fa-bell') }}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% call modal('enrollUser', 'Enrol in a course', 'sm') %}
+<form method="post" action="{{ url_for('users.enroll', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="course_id">Course</label>
+        {{ select('course_id', courses, '', 'Select a course…') }}</div>
+    <div class="field"><label for="payment_status">Payment status</label>
+        {{ select('payment_status', ['free', 'paid', 'pending', 'active', 'trial'], 'free') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Enrol</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('notifyUser', 'Send a notification', 'sm') %}
+<form method="post" action="{{ url_for('users.notify', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" required></div>
+    <div class="field"><label for="message">Message</label><textarea id="message" name="message" required></textarea></div>
+    <div class="field"><label for="type">Type</label>{{ select('type', ['info', 'success', 'warning', 'urgent'], 'info') }}</div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Send</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('linkChild', 'Link a child account', 'sm') %}
+<form method="post" action="{{ url_for('users.link_child', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="student_id">Student</label>
+        {{ select('student_id', students, '', 'Select a student…') }}</div>
+    <label class="checkbox"><input type="checkbox" name="is_verified" value="1" checked> Mark the link verified</label>
+    <p class="muted" style="margin-top:.6rem">Writes both the link row and the student's
+        <code>parent_id</code>, so the app sees it either way.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Link</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('editAiUsage', 'Adjust AI usage', 'sm') %}
+<form method="post" action="{{ url_for('users.set_ai_usage', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="row_id" value="{{ ai_rows[0].id if ai_rows else '' }}">
+    <div class="field-row">
+        <div class="field"><label>Questions used</label>
+            <input type="number" name="questions_used" min="0"
+                   value="{{ ai_rows[0].questions_used if ai_rows else 0 }}"></div>
+        <div class="field"><label>Quizzes used</label>
+            <input type="number" name="quizzes_used" min="0"
+                   value="{{ ai_rows[0].quizzes_used if ai_rows else 0 }}"></div>
+    </div>
+    <p class="muted">Applies to {{ (ai_rows[0].usage_date | date) if ai_rows else 'today' }}.
+        Set both to 0 to hand back a full daily quota.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endcall %}
+
+{% call modal('resetPassword', 'Set a new password', 'sm') %}
+<form method="post" action="{{ url_for('users.reset_password', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="password">New password</label>
+        <input type="text" id="password" name="password" minlength="6" required></div>
+    <p class="muted">Share it with the user over a secure channel - they can change it after signing in.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Update password</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import pagination, modal, action_form, empty_state, select %}
+
+{% block title %}Exams · Athenaeum Admin{% endblock %}
+{% block heading %}Exams{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Exams &amp; Assessments</h1>
+        <p>{{ total }} exam(s) · build question papers and review student results.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline" href="{{ url_for('reports.export', table_name='exam_results') }}">
+            <i class="fas fa-download"></i> Export results</a>
+        <button class="btn btn-primary" data-modal-open="createExam"><i class="fas fa-file-signature"></i> Create exam</button>
+    </div>
+</div>
+
+<div class="widget">
+    <div class="widget-header">
+        <form class="filter-form" method="get" action="{{ url_for('exams.index') }}">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Search exams…">
+            </div>
+            <select name="course_id" data-autosubmit>
+                <option value="all">All courses</option>
+                {% for c in courses %}<option value="{{ c.id }}" {{ 'selected' if course_id == c.id }}>{{ c.title }}</option>{% endfor %}
+            </select>
+            <select name="published" data-autosubmit>
+                <option value="all">Published &amp; draft</option>
+                <option value="true" {{ 'selected' if published == 'true' }}>Published</option>
+                <option value="false" {{ 'selected' if published == 'false' }}>Draft</option>
+            </select>
+            <button class="btn btn-outline btn-sm" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="widget-content flush table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Exam</th><th>Course</th><th>Questions</th><th>Duration</th><th>Marks</th>
+                    <th>Attempts</th><th>Status</th><th class="actions">Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for exam in exams %}
+                <tr>
+                    <td><a class="link" href="{{ url_for('exams.detail', exam_id=exam.id) }}">{{ exam.title }}</a>
+                        <div class="muted">{{ exam.created_at | date }}</div></td>
+                    <td>{{ exam.courses.title if exam.courses else '—' }}</td>
+                    <td>{{ exam.question_count }}</td>
+                    <td class="muted">{{ exam.duration_minutes or 0 }} min</td>
+                    <td>{{ exam.total_marks or 0 }}</td>
+                    <td>{{ exam.attempts }}</td>
+                    <td><span class="badge {{ 'badge-success' if exam.is_published else 'badge-warning' }}">
+                        {{ 'Published' if exam.is_published else 'Draft' }}</span></td>
+                    <td class="actions">
+                        <a class="icon-btn" href="{{ url_for('exams.detail', exam_id=exam.id) }}" title="Open"><i class="fas fa-up-right-from-square"></i></a>
+                        {{ action_form(url_for('exams.toggle_publish', exam_id=exam.id), csrf_token, '',
+                                       'fas fa-eye-slash' if exam.is_published else 'fas fa-eye', 'icon-btn', '',
+                                       {'is_published': '' if exam.is_published else '1'}) }}
+                        {{ action_form(url_for('exams.delete', exam_id=exam.id), csrf_token, '', 'fas fa-trash',
+                                       'icon-btn danger', 'Delete this exam, its questions and all results?') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8">{{ empty_state('No exams match these filters.', 'fas fa-clipboard-list') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ pagination(page, pages, 'exams.index', {'q': search, 'course_id': course_id, 'published': published}) }}
+    </div>
+</div>
+
+{% call modal('createExam', 'Create an exam', 'sm') %}
+<form method="post" action="{{ url_for('exams.create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" required></div>
+    <div class="field"><label for="course_id">Course</label>{{ select('course_id', courses, '', 'No course') }}</div>
+    <div class="field"><label for="teacher_id">Teacher</label>{{ select('teacher_id', teachers, '', 'Unassigned') }}</div>
+    <div class="field"><label for="duration_minutes">Duration (minutes)</label>
+        <input type="number" id="duration_minutes" name="duration_minutes" value="30"></div>
+    <label class="checkbox"><input type="checkbox" name="is_published" value="1"> Publish immediately</label>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create exam</button>
+    </div>
+</form>
+{% endcall %}
+{% endblock %}
