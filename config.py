@@ -20,13 +20,11 @@ class Config:
     SUPABASE_URL = _env("SUPABASE_URL", "BASE_URL")
     SUPABASE_SERVICE_KEY = _env("SUPABASE_SERVICE_KEY", "SERVICE_KEY")
 
-    # Emails allowed to sign in even if their profile row is not marked admin.
-    # Useful for bootstrapping the very first administrator.
-    ADMIN_EMAILS = [
-        e.strip().lower()
-        for e in (_env("ADMIN_EMAILS", default="") or "").split(",")
-        if e.strip()
-    ]
+    # The portal has exactly one operator. Credentials live here, not in
+    # Supabase Auth - signing in must not touch the accounts the student app
+    # uses.
+    ADMIN_EMAIL = (_env("ADMIN_EMAIL", default="athenaeum.institute@gmail.com") or "").lower()
+    ADMIN_PASSWORD = _env("ADMIN_PASSWORD", default="")
 
     # Vercel sets VERCEL=1 in every deployment.
     IS_SERVERLESS = bool(_env("VERCEL", "VERCEL_ENV", "AWS_LAMBDA_FUNCTION_NAME"))
@@ -62,4 +60,9 @@ class Config:
                 "SECRET_KEY must be set in the deployment environment or "
                 "sessions will not persist. Generate one with: "
                 'python -c "import secrets; print(secrets.token_hex(32))"'
+            )
+        # An empty password would let anyone through the login form.
+        if cls.REQUIRE_LOGIN and not cls.ADMIN_PASSWORD:
+            raise RuntimeError(
+                "ADMIN_PASSWORD must be set when the login screen is enabled."
             )

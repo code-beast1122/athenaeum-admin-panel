@@ -21,19 +21,27 @@ No login by default - the dashboard opens straight away.
 | `SUPABASE_SERVICE_KEY` | Service-role key (bypasses RLS - keep it local) |
 | `REQUIRE_LOGIN` | `false` (default) skips the login screen |
 | `SECRET_KEY` | Signs the session cookie |
-| `ADMIN_EMAILS` | Bootstrap allowlist, only used when `REQUIRE_LOGIN=true` |
+| `ADMIN_EMAIL` | The one account that can sign in |
+| `ADMIN_PASSWORD` | Its password - required whenever the login screen is on |
 | `PER_PAGE` | Rows per page in list views (default 25) |
 
 ### Login
 
-Set `REQUIRE_LOGIN=true` and the login screen appears: Supabase Auth checks the
-password, and only profiles with `role = admin` (or an address in
-`ADMIN_EMAILS`) get in. **On Vercel this is forced on and cannot be disabled.**
+The portal has its own single credential, `ADMIN_EMAIL` + `ADMIN_PASSWORD`. It
+does **not** use Supabase Auth: signing in here never touches the accounts the
+student app uses, and changing this password has no effect on anyone's app
+login.
 
-```bash
-flask --app app promote-admin someone@example.com   # set role = admin
-flask --app app list-admins                          # who has access
-```
+The email is fixed, so the login screen only asks for the password. To change
+the password, edit `ADMIN_PASSWORD` in `.env` (and in the Vercel environment
+variables) - no database change involved.
+
+Locally the screen is skipped entirely. **On Vercel it is always on**, and the
+app refuses to start if `ADMIN_PASSWORD` is empty, so the form can never let a
+blank password through.
+
+The `promote-admin` CLI still exists, but it only sets `profiles.role` for the
+student app - it has nothing to do with getting into this portal.
 
 ## Deploying to Vercel
 
@@ -53,22 +61,19 @@ and `.vercelignore` keeps `.env` and `venv/` out of the upload.
 | `SUPABASE_URL` | your project URL |
 | `SUPABASE_SERVICE_KEY` | the service-role key |
 | `SECRET_KEY` | **required** - `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `ADMIN_EMAILS` | optional, only needed to let in an account whose profile role is not `admin` |
+| `ADMIN_PASSWORD` | **required** - the portal password, same value as in `.env` |
+| `ADMIN_EMAIL` | optional, defaults to `athenaeum.institute@gmail.com` |
 
 `SECRET_KEY` is required because every serverless instance signs session
-cookies with it; without a shared value, sign-ins stop sticking. The app says so
-at boot rather than failing later.
+cookies with it; without a shared value, sign-ins stop sticking. Both it and
+`ADMIN_PASSWORD` are checked at boot, so a missing value fails immediately with
+a clear message instead of silently at sign-in.
 
 ### Signing in
 
-The deployment shows the login screen and accepts any profile with
-`role = admin`. Today that is **athenaeum.institute@gmail.com** - sign in with
-that account's Supabase password. To add another admin later, run this locally
-(the CLI is not available on Vercel, but it hits the same database):
-
-```bash
-flask --app app promote-admin someone@example.com
-```
+The login screen asks only for the password, since the email is fixed. Copy
+`ADMIN_PASSWORD` from `.env` into the Vercel environment variables and use the
+same value there.
 
 ### What the hosted build sets automatically
 

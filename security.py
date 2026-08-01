@@ -33,14 +33,14 @@ LOCAL_ADMIN = {
 }
 
 
-def login_admin(profile, email):
+def login_admin(email):
     session.permanent = True
     session[SESSION_KEY] = {
-        "id": profile.get("id"),
+        "id": None,  # resolved from the database when authoring content
         "email": email,
-        "name": profile.get("full_name") or email.split("@")[0],
-        "role": profile.get("role") or "admin",
-        "avatar_url": profile.get("avatar_url"),
+        "name": "Admin",
+        "role": "admin",
+        "avatar_url": None,
     }
 
 
