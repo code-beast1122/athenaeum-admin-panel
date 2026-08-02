@@ -138,6 +138,33 @@ templates/             Jinja templates; _macros.html holds shared UI pieces
 static/                stylesheet and the small JS layer (modals, tabs, confirms)
 ```
 
+## Relationship to the app's database functions
+
+The database carries its own admin layer - `is_admin()`, `admin_update_status`,
+`admin_update_plan`, `admin_assign_teacher`, `admin_hard_delete_user`,
+`admin_update_enrollment_status`, `admin_delete_live_class`,
+`generate_teacher_code`, `verify_teacher_code`, `link_child_by_email`,
+`add_student_xp`, `update_student_streak` - written for the student/teacher app,
+where an admin is signed in through Supabase Auth.
+
+**This portal cannot call them, by design.** They authorise through
+`auth.uid()`, and the portal signs in with its own password instead of Supabase
+Auth, so `auth.uid()` is NULL and every one of them answers *"Access denied"*.
+The portal writes to the tables directly with the service key, which bypasses
+row level security and reaches the same result.
+
+Two consequences worth remembering:
+
+* **The service key is mandatory, not a convenience.** RLS is enabled, and the
+  portal has no `auth.uid()`, so an anon or publishable key would return zero
+  rows for every query - pages would render empty rather than fail. `Config`
+  reads the key's role claim at boot and refuses to start if it is not
+  `service_role`.
+* **Logic living in those functions is skipped.** Awarding XP here moves the
+  balance without the streak milestone bonuses `add_student_xp` applies, and
+  codes generated here skip `generate_teacher_code` (the format is matched
+  deliberately so either kind redeems). Where that matters, the UI says so.
+
 ## Notes on the data
 
 * `profiles.role` is stored with inconsistent casing (`student` and `Student`,

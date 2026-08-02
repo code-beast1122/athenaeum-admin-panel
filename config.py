@@ -1,8 +1,34 @@
+import base64
+import binascii
+import json
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _key_role(key):
+    """Return the role a Supabase key grants, or None if it cannot be read.
+
+    Legacy keys are JWTs carrying a `role` claim; newer ones are prefixed
+    strings. The signature is irrelevant here - this only reads the claim so
+    the app can tell a service key from a publishable one.
+    """
+    if not key:
+        return None
+    if key.startswith("sb_secret_"):
+        return "service_role"
+    if key.startswith("sb_publishable_"):
+        return "anon"
+    if not key.startswith("eyJ"):
+        return None
+    try:
+        payload = key.split(".")[1]
+        payload += "=" * (-len(payload) % 4)  # restore base64 padding
+        return json.loads(base64.urlsafe_b64decode(payload)).get("role")
+    except (IndexError, ValueError, binascii.Error):
+        return None
 
 
 def _env(*names, default=None):
@@ -65,4 +91,16 @@ class Config:
         if cls.REQUIRE_LOGIN and not cls.ADMIN_PASSWORD:
             raise RuntimeError(
                 "ADMIN_PASSWORD must be set when the login screen is enabled."
+            )
+        # Row level security is enabled on the database, and the portal signs in
+        # with its own password rather than Supabase Auth - so there is no
+        # auth.uid() and every RLS policy would reject it. Only the service key
+        # bypasses that. With any other key the pages would load but show
+        # nothing, which reads as "the data vanished" rather than as an error.
+        role = _key_role(cls.SUPABASE_SERVICE_KEY)
+        if role and role != "service_role":
+            raise RuntimeError(
+                f"SUPABASE_SERVICE_KEY holds a '{role}' key. Row level security "
+                "will hide every row from it. Use the service_role key from "
+                "Supabase > Settings > API."
             )

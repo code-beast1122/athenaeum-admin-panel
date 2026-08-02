@@ -20,11 +20,23 @@ bp = Blueprint("requests", __name__)
 protect_blueprint(bp)
 
 TRIAL_STATUSES = ["pending", "contacted", "scheduled", "converted", "rejected"]
-ALPHABET = string.ascii_uppercase + string.digits
+CODE_ALPHABET = string.hexdigits.upper()[:16]  # 0-9A-F
 
 
-def _generate_code():
-    return "ATH-" + "".join(secrets.choice(ALPHABET) for _ in range(6))
+def _generate_code(existing=()):
+    """Mint an unused code in the same shape the database generator uses.
+
+    The DB has its own `generate_teacher_code()`, but it authorises through
+    `auth.uid()` and the portal signs in with its own password, so it cannot be
+    called from here. Matching its `ATH-` + 8 hex format keeps codes uniform
+    whichever side issued them; `code` is UNIQUE, so avoid a collision rather
+    than let the insert fail.
+    """
+    for _ in range(20):
+        code = "ATH-" + "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
+        if code not in existing:
+            return code
+    return code
 
 
 # --- Free trial requests -----------------------------------------------------
@@ -173,10 +185,13 @@ def generate_codes():
     course_id = forms.uuid_or_none(request.form, "course_id")
     created = 0
     try:
+        taken = {c["code"] for c in fetch_all("teacher_access_codes", select="code")}
         for _ in range(quantity):
+            code = _generate_code(taken)
+            taken.add(code)
             insert_row(
                 "teacher_access_codes",
-                {"code": _generate_code(), "course_id": course_id, "is_used": False},
+                {"code": code, "course_id": course_id, "is_used": False},
             )
             created += 1
         flash(f"{created} access code(s) generated.", "success")
