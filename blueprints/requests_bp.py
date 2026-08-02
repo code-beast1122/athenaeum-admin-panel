@@ -136,10 +136,20 @@ def access_codes():
         lookup = profiles_map([r.get("used_by") for r in rows])
         for row in rows:
             row["user"] = lookup.get(row.get("used_by")) or {}
+            # A code flagged used but with no owner means the teacher app
+            # closed it without recording who redeemed it.
+            row["unattributed"] = bool(row.get("is_used")) and not row.get("used_by")
         available = query_table("teacher_access_codes", filters={"is_used": False}, limit=1)[1]
+        redeemed = query_table("teacher_access_codes", filters={"is_used": True}, limit=1)[1]
     except DbError as exc:
         flash(str(exc), "danger")
-        rows, total, pages, available = [], 0, 1, 0
+        rows, total, pages, available, redeemed = [], 0, 1, 0, 0
+
+    teachers = [
+        p
+        for p in fetch_all("profiles", select="id, full_name, role", order_by="full_name")
+        if (p.get("role") or "").lower() in {"teacher", "admin"}
+    ]
 
     return render_template(
         "access_codes.html",
@@ -151,6 +161,8 @@ def access_codes():
         used=used,
         course_id=course_id,
         available=available,
+        redeemed=redeemed,
+        teachers=teachers,
         courses=fetch_all("courses", select="id, title", order_by="title"),
     )
 
@@ -170,6 +182,30 @@ def generate_codes():
         flash(f"{created} access code(s) generated.", "success")
     except DbError as exc:
         flash(f"Generated {created} code(s) before failing: {exc}", "danger")
+    return redirect(url_for("requests.access_codes"))
+
+
+@bp.route("/access-codes/<code_id>/redeem", methods=["POST"])
+def redeem_code(code_id):
+    """Record who used a code.
+
+    The teacher app hands out the course but does not write back to this table,
+    so codes stay `is_used = false` for ever and can be redeemed again. Marking
+    them here closes the code and keeps the audit trail.
+    """
+    teacher_id = forms.uuid_or_none(request.form, "used_by")
+    if not teacher_id:
+        flash("Pick the teacher who used this code.", "danger")
+        return redirect(url_for("requests.access_codes"))
+    try:
+        update_row(
+            "teacher_access_codes",
+            code_id,
+            {"is_used": True, "used_by": teacher_id, "used_at": forms.now_iso()},
+        )
+        flash("Code marked as redeemed.", "success")
+    except DbError as exc:
+        flash(str(exc), "danger")
     return redirect(url_for("requests.access_codes"))
 
 

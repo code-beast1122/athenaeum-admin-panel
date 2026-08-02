@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import pagination, modal, action_form, empty_state, select %}
+{% from '_macros.html' import pagination, modal, action_form, empty_state, select, avatar %}
 
 {% block title %}Access Codes · Athenaeum Admin{% endblock %}
 {% block heading %}Access Codes{% endblock %}
@@ -8,7 +8,7 @@
 <div class="page-header">
     <div>
         <h1>Teacher Access Codes</h1>
-        <p>{{ total }} code(s) · {{ available }} still available to hand out.</p>
+        <p>{{ total }} code(s) · {{ available }} available · {{ redeemed }} redeemed.</p>
     </div>
     <div class="page-actions">
         {{ action_form(url_for('requests.purge_used'), csrf_token, 'Clear used', 'fas fa-broom',
@@ -50,9 +50,16 @@
                         {% else %}<span class="badge badge-success">Available</span>{% endif %}</td>
                     <td class="muted">
                         {% if c.used_by %}
-                        <a class="link" href="{{ url_for('users.detail', user_id=c.used_by) }}">
-                            {{ c.user.full_name or 'Unknown' }}</a>
-                        <div>{{ c.used_at | date }}</div>
+                        <div class="user-info">
+                            {{ avatar(c.user.full_name or '?', c.user.avatar_url) }}
+                            <div>
+                                <a class="link" href="{{ url_for('users.detail', user_id=c.used_by) }}">
+                                    {{ c.user.full_name or 'Unknown user' }}</a>
+                                <div class="muted">{{ c.used_at | date if c.used_at else 'date not recorded' }}</div>
+                            </div>
+                        </div>
+                        {% elif c.unattributed %}
+                        <span class="badge badge-warning">Used - owner not recorded</span>
                         {% else %}—{% endif %}
                     </td>
                     <td class="muted">{{ c.created_at | date }}</td>
@@ -60,6 +67,12 @@
                         {% if c.is_used %}
                         {{ action_form(url_for('requests.reset_code', code_id=c.id), csrf_token, '',
                                        'fas fa-rotate-left', 'icon-btn', 'Make this code available again?') }}
+                        {% else %}
+                        <button class="icon-btn" title="Mark as redeemed" data-modal-open="redeemCode"
+                                data-edit-modal="redeemCode"
+                                data-action="{{ url_for('requests.redeem_code', code_id=c.id) }}"
+                                data-row='{{ {"code_label": c.code} | tojson }}'>
+                            <i class="fas fa-user-check"></i></button>
                         {% endif %}
                         {{ action_form(url_for('requests.delete_code', code_id=c.id), csrf_token, '',
                                        'fas fa-trash', 'icon-btn danger', 'Delete this code?') }}
@@ -73,6 +86,20 @@
         {{ pagination(page, pages, 'requests.access_codes', {'q': search, 'course_id': course_id, 'used': used}) }}
     </div>
 </div>
+
+{% call modal('redeemCode', 'Mark a code as redeemed', 'sm') %}
+<form method="post" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="used_by">Redeemed by</label>
+        {{ select('used_by', teachers, '', 'Select a teacher…') }}</div>
+    <p class="muted">Closes the code so it cannot be used again, and records who
+        used it and when.</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Mark redeemed</button>
+    </div>
+</form>
+{% endcall %}
 
 {% call modal('generateCodes', 'Generate access codes', 'sm') %}
 <form method="post" action="{{ url_for('requests.generate_codes') }}">
