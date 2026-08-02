@@ -1,5 +1,3 @@
-import time
-
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from security import protect_blueprint
@@ -19,9 +17,19 @@ protect_blueprint(bp)
 STATUSES = ["scheduled", "live", "ended"]
 
 
-def _room_name(course_id):
-    prefix = (course_id or "general").split("-")[0]
-    return f"athenaeum-{prefix}-{int(time.time() * 1000)}"
+def _meeting_link(form, field="meeting_link"):
+    """Tidy up a pasted meeting link.
+
+    Teachers paste these by hand, so accept `meet.google.com/abc-defg-hij`
+    without a scheme and store a URL the browser can actually open. Blank is
+    allowed - a class can be scheduled before the link exists.
+    """
+    link = (form.get(field) or "").strip()
+    if not link:
+        return None
+    if not link.startswith(("http://", "https://")):
+        link = "https://" + link.lstrip("/")
+    return link
 
 
 @bp.route("/")
@@ -78,7 +86,7 @@ def create():
         "description": forms.text(request.form, "description", allow_empty=True),
         "start_time": forms.timestamp(request.form, "start_time"),
         "end_time": forms.timestamp(request.form, "end_time"),
-        "jitsi_room_name": forms.text(request.form, "jitsi_room_name") or _room_name(course_id),
+        "meeting_link": _meeting_link(request.form),
         "status": forms.text(request.form, "status", "scheduled"),
     }
     if not payload["title"] or not payload["start_time"] or not payload["end_time"]:
@@ -106,11 +114,28 @@ def update(class_id):
         "status": forms.text(request.form, "status"),
     }
     try:
-        update_row("live_classes", class_id, forms.compact(payload))
+        payload = forms.compact(payload)
+        # Set after compacting: clearing a wrong link means writing NULL, and
+        # compact() drops Nones.
+        if "meeting_link" in request.form:
+            payload["meeting_link"] = _meeting_link(request.form)
+        update_row("live_classes", class_id, payload)
         flash("Live class updated.", "success")
     except DbError as exc:
         flash(str(exc), "danger")
     return redirect(url_for("live_classes.index"))
+
+
+@bp.route("/<class_id>/link", methods=["POST"])
+def set_link(class_id):
+    """Attach or replace the meeting link from the list view."""
+    link = _meeting_link(request.form)
+    try:
+        update_row("live_classes", class_id, {"meeting_link": link})
+        flash("Meeting link saved." if link else "Meeting link removed.", "success")
+    except DbError as exc:
+        flash(str(exc), "danger")
+    return redirect(request.referrer or url_for("live_classes.index"))
 
 
 @bp.route("/<class_id>/status", methods=["POST"])

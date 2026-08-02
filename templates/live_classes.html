@@ -8,7 +8,7 @@
 <div class="page-header">
     <div>
         <h1>Live Classes</h1>
-        <p>{{ total }} session(s) · Jitsi rooms are generated automatically.</p>
+        <p>{{ total }} session(s) · paste the Google Meet link when scheduling.</p>
     </div>
     <div class="page-actions">
         <a class="btn btn-outline" href="{{ url_for('reports.export', table_name='live_classes') }}">
@@ -39,22 +39,37 @@
     <div class="widget-content flush table-wrap">
         <table class="data-table">
             <thead>
-                <tr><th>Class</th><th>Course</th><th>Teacher</th><th>Starts</th><th>Ends</th>
-                    <th>Status</th><th class="actions">Actions</th></tr>
+                <tr><th>Class</th><th>Course</th><th>Teacher</th><th>Meeting link</th>
+                    <th>Starts</th><th>Ends</th><th>Status</th><th class="actions">Actions</th></tr>
             </thead>
             <tbody>
                 {% for c in classes %}
                 <tr>
                     <td><strong>{{ c.title }}</strong>
-                        <div class="muted">{{ c.subject }} · room {{ c.jitsi_room_name | truncate(28) }}</div></td>
+                        <div class="muted">{{ c.subject }}</div></td>
                     <td>{{ c.courses.title if c.courses else '—' }}</td>
                     <td>{{ c.teacher_name }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('live_classes.set_link', class_id=c.id) }}"
+                              style="display:flex;gap:.3rem;align-items:center">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="text" name="meeting_link" value="{{ c.meeting_link or '' }}"
+                                   placeholder="Paste Meet link" style="width:190px">
+                            <button class="icon-btn" type="submit" title="Save link">
+                                <i class="fas fa-floppy-disk"></i></button>
+                        </form>
+                        {% if not c.meeting_link %}
+                        <span class="badge badge-warning">No link yet</span>
+                        {% endif %}
+                    </td>
                     <td class="muted">{{ c.start_time | datetime }}</td>
                     <td class="muted">{{ c.end_time | datetime }}</td>
                     <td>{{ status_badge(c.status) }}</td>
                     <td class="actions">
-                        <a class="icon-btn" title="Open room" target="_blank" rel="noopener"
-                           href="https://meet.jit.si/{{ c.jitsi_room_name }}"><i class="fas fa-door-open"></i></a>
+                        {% if c.meeting_link %}
+                        <a class="icon-btn" title="Join the meeting" target="_blank" rel="noopener"
+                           href="{{ c.meeting_link }}"><i class="fas fa-video"></i></a>
+                        {% endif %}
                         {% if c.status != 'live' %}
                         {{ action_form(url_for('live_classes.set_status', class_id=c.id), csrf_token, '',
                                        'fas fa-play', 'icon-btn', '', {'status': 'live'}) }}
@@ -65,14 +80,14 @@
                         {% endif %}
                         <button class="icon-btn" data-modal-open="editClass" data-edit-modal="editClass"
                                 data-action="{{ url_for('live_classes.update', class_id=c.id) }}"
-                                data-row='{{ {"title": c.title, "subject": c.subject, "teacher_name": c.teacher_name, "teacher_id": c.teacher_id, "course_id": c.course_id, "description": c.description, "start_time": c.start_time | form_datetime, "end_time": c.end_time | form_datetime, "status": c.status} | tojson }}'>
+                                data-row='{{ {"title": c.title, "subject": c.subject, "teacher_name": c.teacher_name, "teacher_id": c.teacher_id, "course_id": c.course_id, "description": c.description, "meeting_link": c.meeting_link, "start_time": c.start_time | form_datetime, "end_time": c.end_time | form_datetime, "status": c.status} | tojson }}'>
                             <i class="fas fa-pen"></i></button>
                         {{ action_form(url_for('live_classes.delete', class_id=c.id), csrf_token, '',
                                        'fas fa-trash', 'icon-btn danger', 'Delete this live class?') }}
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7">{{ empty_state('No classes match these filters.', 'fas fa-video') }}</td></tr>
+                <tr><td colspan="8">{{ empty_state('No classes match these filters.', 'fas fa-video') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -96,6 +111,12 @@
     <div class="field-row">
         <div class="field"><label>Starts</label><input type="datetime-local" name="start_time" required></div>
         <div class="field"><label>Ends</label><input type="datetime-local" name="end_time" required></div>
+    </div>
+    <div class="field">
+        <label>Google Meet link</label>
+        <input type="text" name="meeting_link" placeholder="https://meet.google.com/abc-defg-hij">
+        <small class="muted">Create the meeting in Google Meet and paste the link here.
+            You can leave it blank and add it later.</small>
     </div>
     <div class="field"><label>Description</label><textarea name="description"></textarea></div>
     <div class="form-actions">
@@ -125,6 +146,9 @@
         <div class="field"><label>Starts</label><input type="datetime-local" name="start_time"></div>
         <div class="field"><label>Ends</label><input type="datetime-local" name="end_time"></div>
     </div>
+    <div class="field"><label>Google Meet link</label>
+        <input type="text" name="meeting_link" placeholder="https://meet.google.com/abc-defg-hij">
+        <small class="muted">Clear the box to remove the link.</small></div>
     <div class="field"><label>Status</label>
         <select name="status">{% for s in statuses %}<option value="{{ s }}">{{ s | pretty }}</option>{% endfor %}</select></div>
     <div class="field"><label>Description</label><textarea name="description"></textarea></div>

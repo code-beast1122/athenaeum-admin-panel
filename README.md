@@ -104,7 +104,7 @@ same value there.
 | **Progress** | Per-course completion for each student (lessons done, %, last activity) on the user page, a progress column per student on the course page, mark a whole course complete, or reset progress |
 | **Family links** | Link a student to a parent, verify or unverify the link, unlink; writes both `parent_child_links` and `profiles.parent_id` so the app sees it either way |
 | **Enrollments** | Create, change payment status and transaction reference, delete, filter by course/status, search by student, CSV export |
-| **Live Classes** | Schedule with auto-generated Jitsi room, edit, mark live/ended, open the room, delete |
+| **Live Classes** | Schedule with a pasted Google Meet link, edit, mark live/ended, join the meeting, delete. The link can be added or replaced straight from the list, and a class without one is flagged |
 | **Community** | Approve/hide, pin, edit and delete posts; publish as admin; reply to a post; edit or delete comments; wipe a gamed like count |
 | **Carts** | Abandoned baskets with their value, flagged when the student has since enrolled; convert a basket item into a pending enrollment, remove one, or purge stale ones |
 | **AI usage** | Per-user daily counters with an adjust dialog and a clear action that hands back the quota immediately |

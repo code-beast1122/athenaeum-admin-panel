@@ -108,6 +108,12 @@
                 <div style="text-align:right">
                     <div class="muted">{{ c.start_time | datetime }}</div>
                     {{ status_badge(c.status) }}
+                    {% if c.meeting_link %}
+                    <a class="btn btn-sm btn-ghost" href="{{ c.meeting_link }}" target="_blank" rel="noopener">
+                        <i class="fas fa-video"></i> Join</a>
+                    {% else %}
+                    <span class="badge badge-warning">No link</span>
+                    {% endif %}
                 </div>
             </div>
             {% else %}

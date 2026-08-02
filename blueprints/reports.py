@@ -22,7 +22,7 @@ EXPORTABLE = {
     "exams": "id, title, course_id, teacher_id, duration_minutes, total_marks, is_published, created_at",
     "exam_questions": "id, exam_id, question_text, correct_option, marks, order_index",
     "exam_results": "id, student_id, exam_id, score, total_marks, percentage, time_taken_minutes, completed_at",
-    "live_classes": "id, title, subject, teacher_name, teacher_id, course_id, start_time, end_time, status",
+    "live_classes": "id, title, subject, teacher_name, teacher_id, course_id, start_time, end_time, status, meeting_link",
     "announcements": "id, title, message, target, type, is_active, is_pinned, expires_at, created_at",
     "notifications": "id, user_id, title, message, type, is_read, created_at",
     "free_trial_requests": "id, full_name, email, phone, course_name, preferred_time, status, created_at",

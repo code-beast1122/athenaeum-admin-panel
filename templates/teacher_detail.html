@@ -78,7 +78,7 @@
             <div class="widget-header"><h3>Live classes</h3></div>
             <div class="widget-content flush table-wrap">
                 <table class="data-table">
-                    <thead><tr><th>Class</th><th>Course</th><th>Starts</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Class</th><th>Course</th><th>Starts</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                         {% for c in classes %}
                         <tr>
@@ -86,9 +86,17 @@
                             <td class="muted">{{ c.courses.title if c.courses else '—' }}</td>
                             <td class="muted">{{ c.start_time | datetime }}</td>
                             <td>{{ status_badge(c.status) }}</td>
+                            <td class="actions">
+                                {% if c.meeting_link %}
+                                <a class="icon-btn" href="{{ c.meeting_link }}" target="_blank" rel="noopener"
+                                   title="Join the meeting"><i class="fas fa-video"></i></a>
+                                {% else %}
+                                <span class="badge badge-warning">No link</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4">{{ empty_state('No classes hosted yet.', 'fas fa-video') }}</td></tr>
+                        <tr><td colspan="5">{{ empty_state('No classes hosted yet.', 'fas fa-video') }}</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

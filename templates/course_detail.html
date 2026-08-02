@@ -246,7 +246,15 @@
             <div class="list-row">
                 <div><strong>{{ c.title }}</strong>
                     <div class="muted">{{ c.teacher_name }} · {{ c.start_time | datetime }}</div></div>
-                {{ status_badge(c.status) }}
+                <div style="display:flex;gap:.4rem;align-items:center">
+                    {{ status_badge(c.status) }}
+                    {% if c.meeting_link %}
+                    <a class="btn btn-sm btn-ghost" href="{{ c.meeting_link }}" target="_blank" rel="noopener">
+                        <i class="fas fa-video"></i> Join</a>
+                    {% else %}
+                    <span class="badge badge-warning">No link</span>
+                    {% endif %}
+                </div>
             </div>
             {% else %}
             {{ empty_state('No classes scheduled.', 'fas fa-video') }}
