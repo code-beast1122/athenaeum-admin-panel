@@ -56,12 +56,21 @@ def _enrollment_with_course(enrollment_id):
     )
 
 
+# The page is an approval queue, not a status browser: three views, nothing else.
+VIEWS = {
+    "pending": PENDING,   # waiting on a decision
+    "approved": None,     # already approved (paid or active)
+    "all": None,
+}
+
+
 @bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int)
     search = request.args.get("q", "").strip()
-    status = request.args.get("status", PENDING)
-    course_id = request.args.get("course_id", "all")
+    view = request.args.get("view", "pending")
+    if view not in VIEWS:
+        view = "pending"
 
     prices = _course_prices()
     try:
@@ -75,14 +84,21 @@ def index():
             ]
             in_filters = {"student_id": ids or ["00000000-0000-0000-0000-000000000000"]}
 
+        filters = {}
+        if view == "pending":
+            filters["payment_status"] = PENDING
+
         rows, total, pages = query_table(
             "enrollments",
             select="*, courses(id, title, price, category)",
-            filters={"payment_status": status, "course_id": course_id},
+            filters=filters,
             in_filters=in_filters,
             order_by="enrolled_at",
             page=page,
         )
+        if view == "approved":
+            rows = [r for r in rows if (r.get("payment_status") or "").lower() in PAID_STATES]
+            total = len(rows)
         attach_profiles(rows, "student_id", "student")
 
         all_rows = fetch_all(
@@ -112,11 +128,8 @@ def index():
         pages=pages,
         page=page,
         search=search,
-        status=status,
-        course_id=course_id,
+        view=view,
         summary=summary,
-        statuses=[PENDING, "paid", "active", "trial", "free"],
-        courses=fetch_all("courses", select="id, title", order_by="title"),
     )
 
 

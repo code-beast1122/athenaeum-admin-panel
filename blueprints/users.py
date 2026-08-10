@@ -23,6 +23,8 @@ protect_blueprint(bp)
 ROLES = ["student", "teacher", "admin", "parent"]
 PLANS = ["trial", "paid", "free", "expired"]
 STATUSES = ["active", "blocked", "suspended", "inactive"]
+# profiles.plan_type describes the account; enrollments.payment_status is per course
+PAYMENT_STATUSES = ["free", "paid", "pending", "active", "trial"]
 
 
 def _auth_emails():
@@ -50,6 +52,26 @@ def index():
         emails = _auth_emails()
         for row in rows:
             row["email"] = emails.get(row["id"], "")
+
+        # Each enrollment carries its own payment status, so the list needs them
+        # to offer per-course plan changes without opening every profile.
+        by_student = {}
+        if rows:
+            enrolled = (
+                supabase.table("enrollments")
+                .select("*, courses(id, title)")
+                .in_("student_id", [r["id"] for r in rows])
+                .execute()
+                .data
+                or []
+            )
+            for item in enrolled:
+                by_student.setdefault(item.get("student_id"), []).append(item)
+        for row in rows:
+            row["enrollments"] = sorted(
+                by_student.get(row["id"], []),
+                key=lambda e: ((e.get("courses") or {}).get("title") or ""),
+            )
     except DbError as exc:
         flash(str(exc), "danger")
         rows, total, pages = [], 0, 1
@@ -67,6 +89,7 @@ def index():
         roles=ROLES,
         plans=PLANS,
         statuses=STATUSES,
+        payment_statuses=PAYMENT_STATUSES,
     )
 
 
@@ -146,6 +169,7 @@ def detail(user_id):
         roles=ROLES,
         plans=PLANS,
         statuses=STATUSES,
+        payment_statuses=PAYMENT_STATUSES,
         courses=fetch_all("courses", select="id, title", order_by="title"),
         students=[
             p
@@ -218,6 +242,36 @@ def update(user_id):
     except DbError as exc:
         flash(str(exc), "danger")
     return redirect(url_for("users.detail", user_id=user_id))
+
+
+@bp.route("/<user_id>/plan", methods=["POST"])
+def set_plan(user_id):
+    """Change the profile-wide plan only.
+
+    This is separate from a course's `payment_status`: the plan describes the
+    account, each enrollment is paid for on its own.
+    """
+    plan = forms.text(request.form, "plan_type", "trial")
+    try:
+        update_row(
+            "profiles", user_id, {"plan_type": plan, "updated_at": forms.now_iso()}
+        )
+        flash(f"Global plan set to {plan}.", "success")
+    except DbError as exc:
+        flash(str(exc), "danger")
+    return redirect(request.referrer or url_for("users.index"))
+
+
+@bp.route("/<user_id>/enrollments/<enrollment_id>/plan", methods=["POST"])
+def set_enrollment_plan(user_id, enrollment_id):
+    """Change one course's payment status for this student."""
+    status = forms.text(request.form, "payment_status", "free")
+    try:
+        update_row("enrollments", enrollment_id, {"payment_status": status})
+        flash(f"Course plan set to {status}.", "success")
+    except DbError as exc:
+        flash(str(exc), "danger")
+    return redirect(request.referrer or url_for("users.detail", user_id=user_id))
 
 
 @bp.route("/<user_id>/status", methods=["POST"])

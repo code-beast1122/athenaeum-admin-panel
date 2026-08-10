@@ -82,13 +82,25 @@
             </div>
             <div class="widget-content flush table-wrap">
                 <table class="data-table">
-                    <thead><tr><th>Course</th><th>Status</th><th>Enrolled</th><th class="actions"></th></tr></thead>
+                    <thead><tr><th>Course</th><th>Plan</th><th>Enrolled</th><th class="actions"></th></tr></thead>
                     <tbody>
                         {% for e in enrollments %}
                         <tr>
                             <td><a class="link" href="{{ url_for('courses.detail', course_id=e.course_id) }}">
                                 {{ e.courses.title if e.courses else 'Deleted course' }}</a></td>
-                            <td>{{ status_badge(e.payment_status) }}</td>
+                            <td>
+                                <form method="post" style="display:flex;gap:.35rem;align-items:center"
+                                      action="{{ url_for('users.set_enrollment_plan', user_id=user.id, enrollment_id=e.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <select name="payment_status" style="width:auto" data-dirty-watch>
+                                        {% for s in payment_statuses %}
+                                        <option value="{{ s }}" {{ 'selected' if e.payment_status == s }}>
+                                            {{ s | pretty }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                </form>
+                            </td>
                             <td class="muted">{{ e.enrolled_at | date }}</td>
                             <td class="actions">
                                 {{ action_form(url_for('enrollments.delete', enrollment_id=e.id), csrf_token, '',

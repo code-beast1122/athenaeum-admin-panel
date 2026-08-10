@@ -73,6 +73,9 @@
                     <td>{{ status_badge(user.status) }}</td>
                     <td class="muted">{{ user.created_at | date }}</td>
                     <td class="actions">
+                        <button class="icon-btn" title="Manage courses &amp; plan"
+                                data-modal-open="manage-{{ user.id }}">
+                            <i class="fas fa-sliders"></i></button>
                         <a class="icon-btn" href="{{ url_for('users.detail', user_id=user.id) }}" title="Open"><i class="fas fa-up-right-from-square"></i></a>
                         {% if (user.status or '') | lower == 'active' %}
                             {{ action_form(url_for('users.set_status', user_id=user.id), csrf_token, '',
@@ -95,6 +98,49 @@
         {{ pagination(page, pages, 'users.index', {'q': search, 'role': role, 'status': status, 'plan': plan}) }}
     </div>
 </div>
+
+{# One dialog per row: per-course payment status, then the account-wide plan. #}
+{% for user in users %}
+{% call modal('manage-' ~ user.id, 'Manage Student Courses') %}
+    <div class="field">
+        <label>Student</label>
+        <input type="text" value="{{ user.full_name or 'Unnamed user' }}" readonly>
+    </div>
+
+    <label class="section-label">Course enrollments</label>
+    {% for e in user.enrollments %}
+    <form method="post" class="enrollment-row"
+          action="{{ url_for('users.set_enrollment_plan', user_id=user.id, enrollment_id=e.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <span class="enrollment-title">{{ e.courses.title if e.courses else 'Deleted course' }}</span>
+        <select name="payment_status" style="width:auto" data-dirty-watch>
+            {% for s in payment_statuses %}
+            <option value="{{ s }}" {{ 'selected' if e.payment_status == s }}>{{ s | pretty }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+    </form>
+    {% else %}
+    <p class="muted" style="padding:.5rem 0">Not enrolled in any course yet.</p>
+    {% endfor %}
+
+    <hr class="divider">
+
+    <label class="section-label">Global profile plan</label>
+    <form method="post" action="{{ url_for('users.set_plan', user_id=user.id) }}"
+          class="enrollment-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="plan_type" data-dirty-watch style="flex:1">
+            {% for p in plans %}
+            <option value="{{ p }}" {{ 'selected' if user.plan_type == p }}>{{ p | pretty }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Update Global Plan</button>
+    </form>
+    <p class="muted" style="margin-top:.6rem">The plan describes the account.
+        Each course above is paid for separately.</p>
+{% endcall %}
+{% endfor %}
 
 {% call modal('createUser', 'Add a new user') %}
 <form method="post" action="{{ url_for('users.create') }}">

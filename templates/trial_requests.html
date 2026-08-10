@@ -53,13 +53,16 @@
                     <td>{{ status_badge(r.status) }}</td>
                     <td class="actions">
                         <form method="post" action="{{ url_for('requests.set_trial_status', request_id=r.id) }}"
-                              class="inline-form" style="display:inline-flex;gap:.35rem">
+                              class="inline-form" style="display:inline-flex;gap:.35rem"
+                              data-confirm-status="{{ r.full_name }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <select name="status" style="width:auto" data-autosubmit>
+                            <select name="status" style="width:auto" data-dirty-watch>
                                 {% for s in statuses %}
                                 <option value="{{ s }}" {{ 'selected' if r.status == s }}>{{ s | pretty }}</option>
                                 {% endfor %}
                             </select>
+                            <button type="submit" class="icon-btn" title="Save status">
+                                <i class="fas fa-check"></i></button>
                         </form>
                         {{ action_form(url_for('requests.delete_trial_request', request_id=r.id), csrf_token, '',
                                        'fas fa-trash', 'icon-btn danger', 'Delete this request?') }}

@@ -64,7 +64,27 @@
     var message = form.getAttribute("data-confirm");
     if (message && !window.confirm(message)) {
       event.preventDefault();
+      return;
     }
+
+    // Status changes confirm with the value actually picked, which a static
+    // message cannot show.
+    var subject = form.getAttribute("data-confirm-status");
+    if (subject) {
+      var select = form.querySelector("select[name='status']");
+      var label = select ? select.options[select.selectedIndex].text.trim() : "";
+      if (!window.confirm('Mark ' + subject + ' as "' + label + '"?')) {
+        event.preventDefault();
+      }
+    }
+  });
+
+  // Show that a picked value has not been saved yet.
+  document.querySelectorAll("[data-dirty-watch]").forEach(function (field) {
+    var initial = field.value;
+    field.addEventListener("change", function () {
+      field.classList.toggle("unsaved", field.value !== initial);
+    });
   });
 
   // Filter dropdowns submit their form as soon as they change.

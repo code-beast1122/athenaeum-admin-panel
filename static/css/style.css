@@ -275,6 +275,37 @@ select, textarea {
 textarea { min-height: 96px; resize: vertical; }
 select option { background: #1e293b; color: var(--text-primary); }
 
+/* Manage-courses dialog: one row per enrollment. */
+.section-label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin: 1.1rem 0 0.6rem;
+}
+
+.enrollment-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0;
+}
+
+.enrollment-title { flex: 1; font-weight: 500; }
+
+.divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.2rem 0 0.2rem;
+}
+
+/* A value chosen but not yet submitted. */
+.input.unsaved, select.unsaved {
+    border-color: var(--warning);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
 .field { margin-bottom: 0.9rem; }
 .field label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.35rem; font-weight: 500; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; }
@@ -326,6 +357,8 @@ select option { background: #1e293b; color: var(--text-primary); }
     font-weight: 500; border-bottom: 2px solid transparent; background: transparent; border-top: none; border-left: none; border-right: none; font-family: inherit;
 }
 .tab.active { color: var(--text-primary); border-bottom-color: var(--accent-primary); }
+a.tab { text-decoration: none; }
+.tabs .filter-form { padding-bottom: 0.4rem; }
 .tab-panel[hidden] { display: none; }
 
 .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
