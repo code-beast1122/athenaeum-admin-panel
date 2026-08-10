@@ -37,7 +37,7 @@
         <table class="data-table">
             <thead>
                 <tr><th>Name</th><th>Contact</th><th>Course</th><th>Preferred time</th>
-                    <th>Received</th><th>Status</th><th class="actions">Move to</th></tr>
+                    <th>Received</th><th>Status</th><th class="actions">Actions</th></tr>
             </thead>
             <tbody>
                 {% for r in requests %}
@@ -52,18 +52,21 @@
                     <td class="muted">{{ r.created_at | date }}</td>
                     <td>{{ status_badge(r.status) }}</td>
                     <td class="actions">
-                        <form method="post" action="{{ url_for('requests.set_trial_status', request_id=r.id) }}"
-                              class="inline-form" style="display:inline-flex;gap:.35rem"
-                              data-confirm-status="{{ r.full_name }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <select name="status" style="width:auto" data-dirty-watch>
-                                {% for s in statuses %}
-                                <option value="{{ s }}" {{ 'selected' if r.status == s }}>{{ s | pretty }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit" class="icon-btn" title="Save status">
-                                <i class="fas fa-check"></i></button>
-                        </form>
+                        {% if r.status != 'confirmed' %}
+                        {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
+                                       'Confirm', '', 'btn btn-sm btn-success',
+                                       'Confirm the trial for ' ~ r.full_name ~ '?', {'status': 'confirmed'}) }}
+                        {% endif %}
+                        {% if r.status != 'rejected' %}
+                        {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
+                                       'Reject', '', 'btn btn-sm btn-danger',
+                                       'Reject the trial request from ' ~ r.full_name ~ '?', {'status': 'rejected'}) }}
+                        {% endif %}
+                        {% if r.status != 'pending' %}
+                        {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
+                                       '', 'fas fa-rotate-left', 'icon-btn',
+                                       'Put this request back to pending?', {'status': 'pending'}) }}
+                        {% endif %}
                         {{ action_form(url_for('requests.delete_trial_request', request_id=r.id), csrf_token, '',
                                        'fas fa-trash', 'icon-btn danger', 'Delete this request?') }}
                     </td>

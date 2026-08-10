@@ -135,8 +135,8 @@
                     <div class="muted">{{ r.course_name }} · {{ r.phone }}</div>
                 </div>
                 {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
-                               'Contacted', 'fas fa-check', 'btn btn-sm btn-success', '',
-                               {'status': 'contacted'}) }}
+                               'Confirm', '', 'btn btn-sm btn-success',
+                               'Confirm the trial for ' ~ r.full_name ~ '?', {'status': 'confirmed'}) }}
             </div>
             {% else %}
             {{ empty_state('No pending requests.', 'fas fa-hand-holding-heart') }}

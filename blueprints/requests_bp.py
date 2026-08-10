@@ -19,7 +19,11 @@ from services.db import (
 bp = Blueprint("requests", __name__)
 protect_blueprint(bp)
 
-TRIAL_STATUSES = ["pending", "contacted", "scheduled", "converted", "rejected"]
+# A request sits at "pending" until someone acts. There are only two actions.
+TRIAL_PENDING = "pending"
+TRIAL_CONFIRMED = "confirmed"
+TRIAL_REJECTED = "rejected"
+TRIAL_STATUSES = [TRIAL_PENDING, TRIAL_CONFIRMED, TRIAL_REJECTED]
 CODE_ALPHABET = string.hexdigits.upper()[:16]  # 0-9A-F
 
 
@@ -102,10 +106,13 @@ def create_trial_request():
 
 @bp.route("/trial-requests/<request_id>/status", methods=["POST"])
 def set_trial_status(request_id):
-    status = forms.text(request.form, "status", "pending")
+    status = forms.text(request.form, "status", TRIAL_PENDING)
+    if status not in TRIAL_STATUSES:
+        flash("Unknown status.", "danger")
+        return redirect(request.referrer or url_for("requests.trial_requests"))
     try:
         update_row("free_trial_requests", request_id, {"status": status})
-        flash(f"Request marked as {status}.", "success")
+        flash(f"Request {status}.", "success")
     except DbError as exc:
         flash(str(exc), "danger")
     return redirect(request.referrer or url_for("requests.trial_requests"))

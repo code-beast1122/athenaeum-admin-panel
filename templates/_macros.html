@@ -78,7 +78,7 @@
 
 {% macro status_badge(value) %}
   {% set v = (value or '') | lower %}
-  {% if v in ['active', 'paid', 'published', 'converted', 'approved', 'live'] %}
+  {% if v in ['active', 'paid', 'published', 'converted', 'approved', 'confirmed', 'live'] %}
     {{ badge(value | pretty, 'success') }}
   {% elif v in ['pending', 'trial', 'draft', 'scheduled', 'contacted'] %}
     {{ badge(value | pretty, 'warning') }}
