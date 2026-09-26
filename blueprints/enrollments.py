@@ -6,6 +6,7 @@ from flask import Blueprint, Response, flash, redirect, render_template, request
 from extensions import supabase
 from security import protect_blueprint
 from services import forms
+from services.access import PAID, PAYMENT_STATUSES
 from services.db import (
     DbError,
     attach_profiles,
@@ -19,7 +20,6 @@ from services.db import (
 bp = Blueprint("enrollments", __name__, url_prefix="/enrollments")
 protect_blueprint(bp)
 
-PAYMENT_STATUSES = ["free", "paid", "pending", "active", "trial"]
 
 
 def _student_ids_matching(term):
@@ -68,7 +68,7 @@ def index():
         revenue = sum(
             (r.get("courses") or {}).get("price") or 0
             for r in rows
-            if (r.get("payment_status") or "").lower() in {"paid", "active"}
+            if (r.get("payment_status") or "").lower() == "paid"
         )
     except DbError as exc:
         flash(str(exc), "danger")
@@ -103,7 +103,7 @@ def create():
             {
                 "student_id": student_id,
                 "course_id": course_id,
-                "payment_status": forms.text(request.form, "payment_status", "free"),
+                "payment_status": forms.text(request.form, "payment_status", PAID),
                 "transaction_id": forms.text(request.form, "transaction_id", allow_empty=True),
             },
         )
@@ -120,7 +120,7 @@ def update(enrollment_id):
             "enrollments",
             enrollment_id,
             {
-                "payment_status": forms.text(request.form, "payment_status", "free"),
+                "payment_status": forms.text(request.form, "payment_status", PAID),
                 "transaction_id": forms.text(request.form, "transaction_id", allow_empty=True),
             },
         )

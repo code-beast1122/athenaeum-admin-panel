@@ -32,12 +32,8 @@
                 <option value="all">All statuses</option>
                 {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | pretty }}</option>{% endfor %}
             </select>
-            <select name="plan" data-autosubmit>
-                <option value="all">All plans</option>
-                {% for p in plans %}<option value="{{ p }}" {{ 'selected' if plan == p }}>{{ p | pretty }}</option>{% endfor %}
-            </select>
             <button class="btn btn-outline btn-sm" type="submit">Apply</button>
-            {% if search or role != 'all' or status != 'all' or plan != 'all' %}
+            {% if search or role != 'all' or status != 'all' %}
             <a class="btn btn-ghost btn-sm" href="{{ url_for('users.index') }}">Clear</a>
             {% endif %}
         </form>
@@ -47,7 +43,7 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>User</th><th>Role</th><th>Plan</th><th>XP / Streak</th>
+                    <th>User</th><th>Role</th><th>Active courses</th><th>XP / Streak</th>
                     <th>Status</th><th>Joined</th><th class="actions">Actions</th>
                 </tr>
             </thead>
@@ -65,7 +61,7 @@
                         </div>
                     </td>
                     <td>{{ status_badge(user.role) }}</td>
-                    <td>{{ user.plan_type | pretty }}</td>
+                    <td>{% set active = user.enrollments | selectattr('payment_status') | map('access') | select('equalto', 'active') | list | length %}{{ active }}</td>
                     <td class="muted">
                         <i class="fas fa-star" style="color:#f59e0b"></i> {{ user.xp or 0 }}
                         &nbsp;<i class="fas fa-fire" style="color:#ef4444"></i> {{ user.streak_days or 0 }}
@@ -73,7 +69,7 @@
                     <td>{{ status_badge(user.status) }}</td>
                     <td class="muted">{{ user.created_at | date }}</td>
                     <td class="actions">
-                        <button class="icon-btn" title="Manage courses &amp; plan"
+                        <button class="icon-btn" title="Manage courses"
                                 data-modal-open="manage-{{ user.id }}">
                             <i class="fas fa-sliders"></i></button>
                         <a class="icon-btn" href="{{ url_for('users.detail', user_id=user.id) }}" title="Open"><i class="fas fa-up-right-from-square"></i></a>
@@ -95,11 +91,11 @@
                 {% endfor %}
             </tbody>
         </table>
-        {{ pagination(page, pages, 'users.index', {'q': search, 'role': role, 'status': status, 'plan': plan}) }}
+        {{ pagination(page, pages, 'users.index', {'q': search, 'role': role, 'status': status}) }}
     </div>
 </div>
 
-{# One dialog per row: per-course payment status, then the account-wide plan. #}
+{# One dialog per row: per-course payment status and access window. #}
 {% for user in users %}
 {% call modal('manage-' ~ user.id, 'Manage Student Courses') %}
     <div class="field">
@@ -112,7 +108,11 @@
     <form method="post" class="enrollment-row"
           action="{{ url_for('users.set_enrollment_plan', user_id=user.id, enrollment_id=e.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <span class="enrollment-title">{{ e.courses.title if e.courses else 'Deleted course' }}</span>
+        <span class="enrollment-title">{{ e.courses.title if e.courses else 'Deleted course' }}
+            {% set st = e | access %}
+            <span class="muted" style="display:block;font-size:.75rem">
+                {% if st == 'active' %}Access until {{ e.expires_at | date }}{% elif st == 'expired' %}Expired {{ e.expires_at | date }} — set Paid to renew{% else %}Payment pending{% endif %}
+            </span></span>
         <select name="payment_status" style="width:auto" data-dirty-watch>
             {% for s in payment_statuses %}
             <option value="{{ s }}" {{ 'selected' if e.payment_status == s }}>{{ s | pretty }}</option>
@@ -124,21 +124,6 @@
     <p class="muted" style="padding:.5rem 0">Not enrolled in any course yet.</p>
     {% endfor %}
 
-    <hr class="divider">
-
-    <label class="section-label">Global profile plan</label>
-    <form method="post" action="{{ url_for('users.set_plan', user_id=user.id) }}"
-          class="enrollment-row">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <select name="plan_type" data-dirty-watch style="flex:1">
-            {% for p in plans %}
-            <option value="{{ p }}" {{ 'selected' if user.plan_type == p }}>{{ p | pretty }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-primary">Update Global Plan</button>
-    </form>
-    <p class="muted" style="margin-top:.6rem">The plan describes the account.
-        Each course above is paid for separately.</p>
 {% endcall %}
 {% endfor %}
 
@@ -167,7 +152,6 @@
     </div>
     <div class="field-row">
         <div class="field"><label for="role">Role</label>{{ select('role', roles, 'student') }}</div>
-        <div class="field"><label for="plan_type">Plan</label>{{ select('plan_type', plans, 'trial') }}</div>
         <div class="field"><label for="status">Status</label>{{ select('status', statuses, 'active') }}</div>
     </div>
     <div class="form-actions">

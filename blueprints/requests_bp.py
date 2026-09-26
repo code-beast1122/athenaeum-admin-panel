@@ -19,11 +19,6 @@ from services.db import (
 bp = Blueprint("requests", __name__)
 protect_blueprint(bp)
 
-# A request sits at "pending" until someone acts. There are only two actions.
-TRIAL_PENDING = "pending"
-TRIAL_CONFIRMED = "confirmed"
-TRIAL_REJECTED = "rejected"
-TRIAL_STATUSES = [TRIAL_PENDING, TRIAL_CONFIRMED, TRIAL_REJECTED]
 CODE_ALPHABET = string.hexdigits.upper()[:16]  # 0-9A-F
 
 
@@ -41,91 +36,6 @@ def _generate_code(existing=()):
         if code not in existing:
             return code
     return code
-
-
-# --- Free trial requests -----------------------------------------------------
-
-
-@bp.route("/trial-requests")
-def trial_requests():
-    page = request.args.get("page", 1, type=int)
-    search = request.args.get("q", "").strip()
-    status = request.args.get("status", "all")
-
-    try:
-        rows, total, pages = query_table(
-            "free_trial_requests",
-            search=search,
-            search_fields=("full_name", "email", "phone", "course_name"),
-            filters={"status": status},
-            order_by="created_at",
-            page=page,
-        )
-        pending = query_table("free_trial_requests", filters={"status": "pending"}, limit=1)[1]
-    except DbError as exc:
-        flash(str(exc), "danger")
-        rows, total, pages, pending = [], 0, 1, 0
-
-    return render_template(
-        "trial_requests.html",
-        requests=rows,
-        total=total,
-        pages=pages,
-        page=page,
-        search=search,
-        status=status,
-        pending=pending,
-        statuses=TRIAL_STATUSES,
-    )
-
-
-@bp.route("/trial-requests/create", methods=["POST"])
-def create_trial_request():
-    """Log a request that arrived by phone or WhatsApp."""
-    payload = {
-        "full_name": forms.text(request.form, "full_name"),
-        "email": forms.text(request.form, "email"),
-        "phone": forms.text(request.form, "phone"),
-        "course_name": forms.text(request.form, "course_name"),
-        "preferred_time": forms.text(request.form, "preferred_time"),
-        "status": forms.text(request.form, "status", "pending"),
-        "user_id": forms.uuid_or_none(request.form, "user_id"),
-    }
-    missing = [k for k in ("full_name", "email", "phone", "course_name", "preferred_time")
-               if not payload[k]]
-    if missing:
-        flash("Name, email, phone, course and preferred time are all required.", "danger")
-        return redirect(url_for("requests.trial_requests"))
-    try:
-        insert_row("free_trial_requests", forms.compact(payload))
-        flash("Trial request logged.", "success")
-    except DbError as exc:
-        flash(str(exc), "danger")
-    return redirect(url_for("requests.trial_requests"))
-
-
-@bp.route("/trial-requests/<request_id>/status", methods=["POST"])
-def set_trial_status(request_id):
-    status = forms.text(request.form, "status", TRIAL_PENDING)
-    if status not in TRIAL_STATUSES:
-        flash("Unknown status.", "danger")
-        return redirect(request.referrer or url_for("requests.trial_requests"))
-    try:
-        update_row("free_trial_requests", request_id, {"status": status})
-        flash(f"Request {status}.", "success")
-    except DbError as exc:
-        flash(str(exc), "danger")
-    return redirect(request.referrer or url_for("requests.trial_requests"))
-
-
-@bp.route("/trial-requests/<request_id>/delete", methods=["POST"])
-def delete_trial_request(request_id):
-    try:
-        delete_row("free_trial_requests", request_id)
-        flash("Request deleted.", "success")
-    except DbError as exc:
-        flash(str(exc), "danger")
-    return redirect(url_for("requests.trial_requests"))
 
 
 # --- Teacher access codes ----------------------------------------------------

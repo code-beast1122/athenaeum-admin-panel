@@ -3,6 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from extensions import supabase
 from security import protect_blueprint
 from services import forms
+from services.access import PAID, PAYMENT_STATUSES
 from services.auth_users import email_map
 from services.db import (
     DbError,
@@ -21,10 +22,8 @@ bp = Blueprint("users", __name__, url_prefix="/users")
 protect_blueprint(bp)
 
 ROLES = ["student", "teacher", "admin", "parent"]
-PLANS = ["trial", "paid", "free", "expired"]
 STATUSES = ["active", "blocked", "suspended", "inactive"]
-# profiles.plan_type describes the account; enrollments.payment_status is per course
-PAYMENT_STATUSES = ["free", "paid", "pending", "active", "trial"]
+# Access is per course: pending, or paid for one month (see services/access.py)
 
 
 def _auth_emails():
@@ -37,7 +36,6 @@ def index():
     search = request.args.get("q", "").strip()
     role = request.args.get("role", "all")
     status = request.args.get("status", "all")
-    plan = request.args.get("plan", "all")
 
     try:
         rows, total, pages = query_table(
@@ -45,7 +43,7 @@ def index():
             search=search,
             search_fields=("full_name", "phone"),
             ilike_filters={"role": role},
-            filters={"status": status, "plan_type": plan},
+            filters={"status": status},
             order_by="created_at",
             page=page,
         )
@@ -85,9 +83,7 @@ def index():
         search=search,
         role=role,
         status=status,
-        plan=plan,
         roles=ROLES,
-        plans=PLANS,
         statuses=STATUSES,
         payment_statuses=PAYMENT_STATUSES,
     )
@@ -167,7 +163,6 @@ def detail(user_id):
         progress=progress,
         cart=cart,
         roles=ROLES,
-        plans=PLANS,
         statuses=STATUSES,
         payment_statuses=PAYMENT_STATUSES,
         courses=fetch_all("courses", select="id, title", order_by="title"),
@@ -205,7 +200,6 @@ def create():
         "id": user_id,
         "full_name": forms.text(request.form, "full_name") or email.split("@")[0],
         "role": forms.text(request.form, "role", "student"),
-        "plan_type": forms.text(request.form, "plan_type", "trial"),
         "status": forms.text(request.form, "status", "active"),
         "phone": forms.text(request.form, "phone"),
     }
@@ -227,7 +221,6 @@ def update(user_id):
     payload = {
         "full_name": forms.text(request.form, "full_name"),
         "role": forms.text(request.form, "role"),
-        "plan_type": forms.text(request.form, "plan_type"),
         "status": forms.text(request.form, "status"),
         "phone": forms.text(request.form, "phone", allow_empty=True),
         "avatar_url": forms.text(request.form, "avatar_url", allow_empty=True),
@@ -244,31 +237,20 @@ def update(user_id):
     return redirect(url_for("users.detail", user_id=user_id))
 
 
-@bp.route("/<user_id>/plan", methods=["POST"])
-def set_plan(user_id):
-    """Change the profile-wide plan only.
-
-    This is separate from a course's `payment_status`: the plan describes the
-    account, each enrollment is paid for on its own.
-    """
-    plan = forms.text(request.form, "plan_type", "trial")
-    try:
-        update_row(
-            "profiles", user_id, {"plan_type": plan, "updated_at": forms.now_iso()}
-        )
-        flash(f"Global plan set to {plan}.", "success")
-    except DbError as exc:
-        flash(str(exc), "danger")
-    return redirect(request.referrer or url_for("users.index"))
-
 
 @bp.route("/<user_id>/enrollments/<enrollment_id>/plan", methods=["POST"])
 def set_enrollment_plan(user_id, enrollment_id):
-    """Change one course's payment status for this student."""
-    status = forms.text(request.form, "payment_status", "free")
+    """Change one course's payment status for this student.
+
+    Setting an expired course back to paid starts a new month of access.
+    """
+    status = forms.text(request.form, "payment_status", PAID)
+    if status not in PAYMENT_STATUSES:
+        flash("Unknown payment status.", "danger")
+        return redirect(request.referrer or url_for("users.detail", user_id=user_id))
     try:
         update_row("enrollments", enrollment_id, {"payment_status": status})
-        flash(f"Course plan set to {status}.", "success")
+        flash(f"Course set to {status}.", "success")
     except DbError as exc:
         flash(str(exc), "danger")
     return redirect(request.referrer or url_for("users.detail", user_id=user_id))
@@ -334,7 +316,7 @@ def enroll(user_id):
             {
                 "student_id": user_id,
                 "course_id": course_id,
-                "payment_status": forms.text(request.form, "payment_status", "free"),
+                "payment_status": forms.text(request.form, "payment_status", PAID),
             },
         )
         flash("Student enrolled.", "success")
@@ -552,7 +534,6 @@ OWNED_ROWS = (
     ("post_likes", "user_id"),
     ("post_comments", "user_id"),
     ("community_posts", "user_id"),
-    ("free_trial_requests", "user_id"),
     ("parent_child_links", "parent_id"),
     ("parent_child_links", "student_id"),
 )

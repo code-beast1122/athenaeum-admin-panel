@@ -3,6 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from extensions import supabase
 from security import protect_blueprint
 from services import forms
+from services.access import is_active
 from services.db import (
     DbError,
     delete_row,
@@ -16,18 +17,20 @@ from services.db import (
 bp = Blueprint("communications", __name__)
 protect_blueprint(bp)
 
-TARGETS = ["all", "paid", "trial", "parents", "teachers"]
+TARGETS = ["all", "paid", "parents", "teachers"]
 TYPES = ["info", "success", "warning", "urgent"]
 
 
 def _recipients(target):
     """Resolve an announcement target into profile ids."""
-    profiles = fetch_all("profiles", select="id, role, plan_type")
+    profiles = fetch_all("profiles", select="id, role")
     target = (target or "all").lower()
     if target == "all":
         return [p["id"] for p in profiles]
-    if target in {"paid", "trial"}:
-        return [p["id"] for p in profiles if (p.get("plan_type") or "").lower() == target]
+    if target == "paid":
+        # Students with at least one active (paid, unexpired) course
+        enrollments = fetch_all("enrollments", select="student_id, payment_status, expires_at")
+        return list({e["student_id"] for e in enrollments if is_active(e) and e.get("student_id")})
     if target == "teachers":
         return [p["id"] for p in profiles if (p.get("role") or "").lower() == "teacher"]
     if target == "parents":

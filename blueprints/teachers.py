@@ -172,7 +172,6 @@ def create():
         "id": teacher_id,
         "full_name": full_name or email.split("@")[0],
         "role": "teacher",
-        "plan_type": "paid",
         "status": "active",
         "phone": forms.text(request.form, "phone"),
     }

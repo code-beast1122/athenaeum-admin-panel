@@ -95,10 +95,10 @@ same value there.
 
 | Section | Capabilities |
 | --- | --- |
-| **Dashboard** | Live counts, revenue from paid enrollments, 14-day enrollment/sign-up trend, 7-day AI usage, role split, upcoming classes, pending trial requests |
-| **Users** | Search/filter by role, status and plan; create account (Auth + profile); edit profile; change role, plan, XP, streak; block/unblock (also bans the Auth user); reset password; enrol in a course; send a notification; delete user (owned rows removed, courses/exams/classes detached) |
+| **Dashboard** | Live counts, revenue from paid enrollments, 14-day enrollment/sign-up trend, 7-day AI usage, role split, upcoming classes |
+| **Users** | Search/filter by role and status; create account (Auth + profile); edit profile; change role, XP, streak; per-course payment status and access window; block/unblock (also bans the Auth user); reset password; enrol in a course; send a notification; delete user (owned rows removed, courses/exams/classes detached) |
 | **Teachers** | Roster with course, student, class and exam counts; create a teacher account; promote an existing user; assign/unassign courses; list of courses with no instructor; per-teacher view of courses, live classes, exams, materials and redeemed access codes; notify, block, demote or make admin |
-| **Payments** | Approval queue for pending enrollments: verify the transaction reference, approve (notifies the student and can lift them off the trial plan), reject (removes access and explains why), revert an approval, bulk approve, pending/approved/monthly totals, CSV export |
+| **Payments** | Approval queue for pending enrollments: verify the transaction reference, approve (notifies the student; the database grants one month of access from approval), reject (removes access and explains why), revert an approval, bulk approve, pending/approved/monthly totals, CSV export |
 | **Courses** | CRUD, publish/unpublish, instructor assignment, learning outcomes; per-course modules and lessons (ordering, video URL, duration, free-preview); materials; enrolled students; linked exams and live classes |
 | **Exams** | CRUD, publish/unpublish, question bank (4 options + correct answer + marks, total marks recalculated automatically), results with averages and pass counts, record an attempt by hand, regrade a score, clear an attempt so a student can retake |
 | **Progress** | Per-course completion for each student (lessons done, %, last activity) on the user page, a progress column per student on the course page, mark a whole course complete, or reset progress |
@@ -109,8 +109,7 @@ same value there.
 | **Carts** | Abandoned baskets with their value, flagged when the student has since enrolled; convert a basket item into a pending enrollment, remove one, or purge stale ones |
 | **AI usage** | Per-user daily counters with an adjust dialog and a clear action that hands back the quota immediately |
 | **Announcements** | CRUD, audience targeting, type, pin, expiry, archive; optionally push the same text as a notification |
-| **Notifications** | Broadcast to an audience (all/paid/trial/teachers/parents), browse, delete, purge read |
-| **Trial Requests** | Log a phone/WhatsApp enquiry, track pending → contacted → scheduled → converted/rejected, CSV export |
+| **Notifications** | Broadcast to an audience (all/students with an active course/teachers/parents), browse, delete, purge read |
 | **Access Codes** | Generate in bulk, reset a redeemed code, delete, purge used |
 | **Reports** | Revenue by course, XP leaderboard, heaviest AI users, course mix, CSV export of **all 21 tables** |
 

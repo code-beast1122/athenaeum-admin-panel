@@ -30,7 +30,7 @@ protect_blueprint(bp)
 
 PENDING = "pending"
 APPROVED = "paid"
-PAID_STATES = {"paid", "active"}
+PAID_STATES = {"paid"}
 
 
 def _course_prices():
@@ -148,13 +148,7 @@ def approve(enrollment_id):
         update_row("enrollments", enrollment_id, payload)
 
         course_title = (row.get("courses") or {}).get("title", "your course")
-        # A verified payment also lifts the student off the trial plan.
-        if forms.boolean(request.form, "upgrade_plan"):
-            update_row(
-                "profiles",
-                row.get("student_id"),
-                {"plan_type": "paid", "updated_at": forms.now_iso()},
-            )
+        # The database stamps a one-month expires_at when the row turns paid.
         _notify(
             row.get("student_id"),
             "Payment approved",

@@ -10,6 +10,7 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 
 from config import Config
 from security import csrf_token, current_admin, is_authenticated
+from services.access import access_state
 
 
 def create_app():
@@ -38,6 +39,21 @@ def create_app():
     app.register_blueprint(communications.bp)
     app.register_blueprint(requests_bp.bp)
     app.register_blueprint(reports.bp)
+
+    @app.after_request
+    def security_headers(response):
+        # The portal is never embedded anywhere: block clickjacking and sniffing.
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+        if Config.IS_SERVERLESS:
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        # Admin pages hold personal data: keep them out of shared caches.
+        if not request.path.startswith("/static/"):
+            response.headers.setdefault("Cache-Control", "no-store")
+        return response
 
     register_template_helpers(app)
     register_error_handlers(app)
@@ -94,6 +110,11 @@ def register_template_helpers(app):
         if not parts:
             return "?"
         return (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
+
+    @app.template_filter("access")
+    def access(row):
+        """active / expired / pending for an enrollment row."""
+        return access_state(row or {})
 
     @app.template_filter("pretty")
     def pretty(value):

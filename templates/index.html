@@ -26,7 +26,7 @@
     {{ stat_card('Enrollments', stats.enrollments, 'fas fa-user-graduate', 'amber', stats.paid_enrollments ~ ' paid') }}
     {{ stat_card('Revenue', stats.revenue | money, 'fas fa-wallet', 'blue', 'From paid enrollments') }}
     {{ stat_card('AI Interactions', stats.ai_interactions, 'fas fa-robot', 'pink', 'Questions + quizzes') }}
-    {{ stat_card('Pending Reviews', stats.pending_posts + stats.pending_trials, 'fas fa-inbox', 'red', stats.pending_posts ~ ' posts · ' ~ stats.pending_trials ~ ' trials') }}
+    {{ stat_card('Pending Reviews', stats.pending_posts, 'fas fa-inbox', 'red', stats.pending_posts ~ ' posts') }}
 </div>
 
 {% if stats.pending_payments %}
@@ -122,27 +122,6 @@
         </div>
     </div>
 
-    <div class="widget">
-        <div class="widget-header">
-            <h3>Pending trial requests</h3>
-            <a class="view-all" href="{{ url_for('requests.trial_requests') }}">Manage</a>
-        </div>
-        <div class="widget-content flush">
-            {% for r in trial_requests %}
-            <div class="list-row">
-                <div>
-                    <strong>{{ r.full_name }}</strong>
-                    <div class="muted">{{ r.course_name }} · {{ r.phone }}</div>
-                </div>
-                {{ action_form(url_for('requests.set_trial_status', request_id=r.id), csrf_token,
-                               'Confirm', '', 'btn btn-sm btn-success',
-                               'Confirm the trial for ' ~ r.full_name ~ '?', {'status': 'confirmed'}) }}
-            </div>
-            {% else %}
-            {{ empty_state('No pending requests.', 'fas fa-hand-holding-heart') }}
-            {% endfor %}
-        </div>
-    </div>
 </div>
 {% endblock %}
 

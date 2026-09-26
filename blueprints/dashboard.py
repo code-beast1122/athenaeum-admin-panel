@@ -39,7 +39,6 @@ def index():
     stats = {}
     warning = None
     enrollments = []
-    trial_requests = []
     upcoming_classes = []
 
     try:
@@ -51,7 +50,6 @@ def index():
         stats["enrollments"] = count_table("enrollments")
         stats["pending_payments"] = count_table("enrollments", filters={"payment_status": "pending"})
         stats["pending_posts"] = count_table("community_posts", filters={"is_approved": False})
-        stats["pending_trials"] = count_table("free_trial_requests", filters={"status": "pending"})
         stats["live_classes"] = count_table("live_classes", filters={"status": "scheduled"})
         stats["unused_codes"] = count_table("teacher_access_codes", filters={"is_used": False})
 
@@ -64,7 +62,7 @@ def index():
         paid = [
             r
             for r in fetch_all("enrollments", select="course_id, payment_status, enrolled_at")
-            if (r.get("payment_status") or "").lower() in {"paid", "active"}
+            if (r.get("payment_status") or "").lower() == "paid"
         ]
         prices = {c["id"]: (c.get("price") or 0) for c in fetch_all("courses", select="id, price")}
         stats["revenue"] = sum(prices.get(r.get("course_id"), 0) or 0 for r in paid)
@@ -78,10 +76,6 @@ def index():
         )
         attach_profiles(enrollments, "student_id", "student")
 
-        trial_requests, _, _ = query_table(
-            "free_trial_requests", filters={"status": "pending"}, limit=5
-        )
-
         upcoming_classes, _, _ = query_table(
             "live_classes",
             select="*, courses(title)",
@@ -93,7 +87,7 @@ def index():
         warning = str(exc)
         stats = {k: stats.get(k, 0) for k in
                  ["total_users", "students", "teachers", "active_courses", "draft_courses",
-                  "enrollments", "pending_payments", "pending_posts", "pending_trials",
+                  "enrollments", "pending_payments", "pending_posts",
                   "live_classes", "unused_codes", "ai_interactions", "revenue",
                   "paid_enrollments"]}
 
@@ -101,7 +95,6 @@ def index():
         "index.html",
         stats=stats,
         recent_enrollments=enrollments,
-        trial_requests=trial_requests,
         upcoming_classes=upcoming_classes,
         warning=warning,
     )
@@ -114,7 +107,7 @@ def charts():
         enrollments = fetch_all("enrollments", select="enrolled_at")
         signups = fetch_all("profiles", select="created_at")
         ai_rows = fetch_all("ai_usage", select="usage_date, questions_used, quizzes_used")
-        profiles = fetch_all("profiles", select="role, plan_type, status")
+        profiles = fetch_all("profiles", select="role, status")
         courses = fetch_all("courses", select="category, is_published")
     except DbError as exc:
         return jsonify({"error": str(exc)}), 502
@@ -135,7 +128,6 @@ def charts():
             ai_days[key]["quizzes"] += row.get("quizzes_used") or 0
 
     roles = Counter((p.get("role") or "unknown").strip().lower() for p in profiles)
-    plans = Counter((p.get("plan_type") or "unknown").strip().lower() for p in profiles)
     categories = Counter((c.get("category") or "uncategorised") for c in courses)
 
     return jsonify(
@@ -149,7 +141,6 @@ def charts():
                 "quizzes": [v["quizzes"] for v in ai_days.values()],
             },
             "roles": {"labels": list(roles.keys()), "values": list(roles.values())},
-            "plans": {"labels": list(plans.keys()), "values": list(plans.values())},
             "categories": {
                 "labels": [c.replace("_", " ").title() for c in categories.keys()],
                 "values": list(categories.values()),

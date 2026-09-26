@@ -75,8 +75,7 @@
                         {% if (p.payment_status or '') | lower == 'pending' %}
                             {{ action_form(url_for('payments.approve', enrollment_id=p.id), csrf_token,
                                            'Approve', '', 'btn btn-sm btn-success',
-                                           'Approve this payment? The student is notified and gets access.',
-                                           {'upgrade_plan': '1'}) }}
+                                           'Approve this payment? The student is notified and gets one month of access.') }}
                             <button class="btn btn-sm btn-danger" data-modal-open="rejectPayment"
                                     data-edit-modal="rejectPayment"
                                     data-action="{{ url_for('payments.reject', enrollment_id=p.id) }}">

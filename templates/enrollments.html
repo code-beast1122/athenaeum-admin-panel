@@ -40,7 +40,7 @@
         <table class="data-table">
             <thead>
                 <tr><th>Student</th><th>Course</th><th>Price</th><th>Payment</th>
-                    <th>Transaction</th><th>Enrolled</th><th class="actions">Actions</th></tr>
+                    <th>Access</th><th>Transaction</th><th>Enrolled</th><th class="actions">Actions</th></tr>
             </thead>
             <tbody>
                 {% for e in enrollments %}
@@ -53,6 +53,8 @@
                         {% else %}<span class="muted">Deleted course</span>{% endif %}</td>
                     <td>{{ (e.courses.price if e.courses else 0) | money }}</td>
                     <td>{{ status_badge(e.payment_status) }}</td>
+                    <td>{% set st = e | access %}{% if st == 'pending' %}<span class="muted">—</span>{% else %}{{ status_badge(st) }}
+                        <div class="muted" style="font-size:.75rem">{{ 'until' if st == 'active' else 'ended' }} {{ e.expires_at | date }}</div>{% endif %}</td>
                     <td class="muted">{{ e.transaction_id or '—' }}</td>
                     <td class="muted">{{ e.enrolled_at | date }}</td>
                     <td class="actions">
@@ -65,7 +67,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7">{{ empty_state('No enrollments match these filters.', 'fas fa-user-graduate') }}</td></tr>
+                <tr><td colspan="8">{{ empty_state('No enrollments match these filters.', 'fas fa-user-graduate') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -78,7 +80,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field"><label for="student_id">Student</label>{{ select('student_id', students, '', 'Select a student…') }}</div>
     <div class="field"><label for="course_id">Course</label>{{ select('course_id', courses, '', 'Select a course…') }}</div>
-    <div class="field"><label for="payment_status">Payment status</label>{{ select('payment_status', statuses, 'free') }}</div>
+    <div class="field"><label for="payment_status">Payment status</label>{{ select('payment_status', statuses, 'paid') }}</div>
     <div class="field"><label>Transaction reference</label><input type="text" name="transaction_id"></div>
     <div class="form-actions">
         <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>

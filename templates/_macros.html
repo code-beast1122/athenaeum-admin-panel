@@ -80,7 +80,7 @@
   {% set v = (value or '') | lower %}
   {% if v in ['active', 'paid', 'published', 'converted', 'approved', 'confirmed', 'live'] %}
     {{ badge(value | pretty, 'success') }}
-  {% elif v in ['pending', 'trial', 'draft', 'scheduled', 'contacted'] %}
+  {% elif v in ['pending', 'draft', 'scheduled', 'contacted'] %}
     {{ badge(value | pretty, 'warning') }}
   {% elif v in ['blocked', 'suspended', 'rejected', 'expired', 'ended'] %}
     {{ badge(value | pretty, 'danger') }}

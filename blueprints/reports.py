@@ -13,11 +13,11 @@ protect_blueprint(bp)
 # Every table in the schema is exportable; the column list keeps CSVs readable
 # and doubles as an allowlist, since the table name comes from the URL.
 EXPORTABLE = {
-    "profiles": "id, full_name, role, plan_type, status, xp, streak_days, phone, parent_id, created_at",
+    "profiles": "id, full_name, role, status, xp, streak_days, phone, parent_id, created_at",
     "courses": "id, title, category, subject, price, instructor_id, is_published, created_at",
     "modules": "id, course_id, title, order_index",
     "lessons": "id, module_id, title, video_url, duration_minutes, order_index, is_free_preview",
-    "enrollments": "id, student_id, course_id, payment_status, transaction_id, enrolled_at",
+    "enrollments": "id, student_id, course_id, payment_status, transaction_id, enrolled_at, paid_at, expires_at",
     "user_progress": "id, student_id, lesson_id, completed, completed_at, xp_awarded",
     "exams": "id, title, course_id, teacher_id, duration_minutes, total_marks, is_published, created_at",
     "exam_questions": "id, exam_id, question_text, correct_option, marks, order_index",
@@ -25,7 +25,6 @@ EXPORTABLE = {
     "live_classes": "id, title, subject, teacher_name, teacher_id, course_id, start_time, end_time, status, meeting_link",
     "announcements": "id, title, message, target, type, is_active, is_pinned, expires_at, created_at",
     "notifications": "id, user_id, title, message, type, is_read, created_at",
-    "free_trial_requests": "id, full_name, email, phone, course_name, preferred_time, status, created_at",
     "teacher_access_codes": "id, code, course_id, is_used, used_by, used_at, created_at",
     "community_posts": "id, author_name, author_role, category, is_approved, is_pinned, likes_count, comments_count, created_at",
     "post_comments": "id, post_id, author_name, author_role, content, created_at",
@@ -42,7 +41,7 @@ def index():
     try:
         courses = fetch_all("courses", select="id, title, price, category, is_published")
         enrollments = fetch_all("enrollments", select="course_id, payment_status, student_id")
-        profiles = fetch_all("profiles", select="id, full_name, xp, streak_days, role, plan_type")
+        profiles = fetch_all("profiles", select="id, full_name, xp, streak_days, role")
         ai_rows = fetch_all("ai_usage", select="user_id, questions_used, quizzes_used")
         results = fetch_all("exam_results", select="exam_id, percentage, student_id")
     except DbError as exc:
@@ -57,7 +56,7 @@ def index():
             continue
         bucket = per_course[course["id"]]
         bucket["count"] += 1
-        if (row.get("payment_status") or "").lower() in {"paid", "active"}:
+        if (row.get("payment_status") or "").lower() == "paid":
             bucket["revenue"] += float(course.get("price") or 0)
 
     top_courses = sorted(

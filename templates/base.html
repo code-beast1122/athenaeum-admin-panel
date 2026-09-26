@@ -49,8 +49,6 @@
                         <a href="{{ url_for('communications.notifications') }}"><i class="fas fa-bell"></i> Notifications</a></li>
 
                     <li class="nav-section">Operations</li>
-                    <li class="{{ 'active' if request.endpoint == 'requests.trial_requests' }}">
-                        <a href="{{ url_for('requests.trial_requests') }}"><i class="fas fa-hand-holding-heart"></i> Trial Requests</a></li>
                     <li class="{{ 'active' if request.endpoint == 'requests.access_codes' }}">
                         <a href="{{ url_for('requests.access_codes') }}"><i class="fas fa-key"></i> Access Codes</a></li>
                 </ul>
