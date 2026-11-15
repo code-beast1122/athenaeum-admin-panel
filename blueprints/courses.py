@@ -19,7 +19,7 @@ from services.db import (
 bp = Blueprint("courses", __name__, url_prefix="/courses")
 protect_blueprint(bp)
 
-CATEGORIES = ["o_levels", "a_levels", "matric", "inter", "skill", "academic", "tech"]
+CATEGORIES = ["o_levels", "a_levels", "skill", "academic", "tech"]
 MATERIAL_TYPES = ["pdf", "announcement", "link", "image"]
 
 
